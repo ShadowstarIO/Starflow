@@ -1,0 +1,25 @@
+[
+  {
+    "Author": "Shadowstar",
+    "Name": "Flow",
+    "Punchline": "Set up a flow. When it matches, it does the rest.",
+    "Description": "A graph of When, Do, Until, and After cards. Conditions read zone, duty, job, time, and loaded plugins. Actions write game settings, run commands and repeated macros, switch plugin collections, set online status, apply Glamourer designs, and change Penumbra mod state and priority.",
+    "InternalName": "Flow",
+    "AssemblyVersion": "0.1.0.0",
+    "TestingAssemblyVersion": "0.1.0.0",
+    "RepoUrl": "https://github.com/ShadowstarIO/Flow",
+    "ApplicableVersion": "any",
+    "DalamudApiLevel": 15,
+    "TestingDalamudApiLevel": 15,
+    "IsHide": false,
+    "IsTestingExclusive": false,
+    "DownloadCount": 0,
+    "LastUpdate": 0,
+    "LoadPriority": 0,
+    "IconUrl": "https://raw.githubusercontent.com/ShadowstarIO/Flow/main/images/icon.png",
+    "DownloadLinkInstall": "https://github.com/ShadowstarIO/Flow/releases/download/v0.1.0.0/Flow.zip",
+    "DownloadLinkUpdate": "https://github.com/ShadowstarIO/Flow/releases/download/v0.1.0.0/Flow.zip",
+    "DownloadLinkTesting": "https://github.com/ShadowstarIO/Flow/releases/download/v0.1.0.0/Flow.zip",
+    "Tags": ["flow", "conditions", "settings", "commands", "penumbra", "glamourer"]
+  }
+]
