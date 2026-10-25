@@ -19,6 +19,7 @@ public sealed class Configuration : IPluginConfiguration
     public bool QuietWhenDead { get; set; } = true;
     public float PollSec { get; set; } = 0.4f;
     public List<FlowItem> Flows { get; set; } = [];
+    public List<string> Folders { get; set; } = [];
 
     public void Save() => Plugin.PluginInterface.SavePluginConfig(this);
 }

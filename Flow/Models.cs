@@ -36,15 +36,23 @@ public static class CardType
     public const string Job = "job";
     public const string Role = "role";
     public const string Zone = "zone";
+    public const string Region = "region";
     public const string World = "world";
     public const string DataCenter = "dc";
+    public const string Account = "account";
     public const string Place = "place";
+    public const string Housing = "housing";
     public const string Duty = "duty";
     public const string Party = "party";
+    public const string Group = "group";
     public const string Nearby = "nearby";
+    public const string NearbyName = "nearby-name";
     public const string Level = "level";
     public const string Time = "time";
     public const string Weekday = "weekday";
+    public const string Schedule = "schedule";
+    public const string Weather = "weather";
+    public const string Mount = "mount";
     public const string Status = "status";
     public const string Target = "target";
     public const string Plugin = "plugin";
@@ -54,6 +62,7 @@ public static class CardType
     public const string Notice = "notice";
     public const string Setting = "setting";
     public const string Online = "online";
+    public const string SearchComment = "search-comment";
     public const string Collection = "collection";
     public const string PluginSet = "plugin-set";
     public const string Glamour = "glamour";
@@ -61,10 +70,16 @@ public static class CardType
     public const string PenumbraMod = "penumbra-mod";
     public const string PenumbraCollection = "penumbra-collection";
     public const string PenumbraReset = "penumbra-reset";
+    public const string Logout = "logout";
+    public const string CloseGame = "close-game";
 
     public static bool IsCondition(string type) => type is
-        State or Job or Role or Zone or World or DataCenter or Place or Duty
-        or Party or Nearby or Level or Time or Weekday or Status or Target or Plugin;
+        State or Job or Role or Zone or Region or World or DataCenter or Account or Place or Housing or Duty
+        or Party or Group or Nearby or NearbyName or Level or Time or Weekday or Schedule or Weather or Mount
+        or Status or Target or Plugin;
+
+    public static bool IsSlotted(string type) => type is
+        Setting or Online or Glamour or GlamourRevert or PenumbraMod;
 }
 
 [Serializable]
@@ -82,6 +97,8 @@ public sealed class Card
     public bool Flag { get; set; } = true;
     public bool Not { get; set; }
     public bool Permanent { get; set; }
+    public bool Inherit { get; set; }
+    public bool Keep { get; set; }
 
     public string Label => Catalog.Label(this);
 }
@@ -100,9 +117,10 @@ public sealed class FlowItem
     public Join WhenJoin { get; set; } = Join.All;
     public Join UntilJoin { get; set; } = Join.Any;
     public float HoldSec { get; set; }
+    public bool IgnoreQuiet { get; set; }
     public List<Card> Cards { get; set; } = [];
 
-    public string FolderKey => string.IsNullOrWhiteSpace(Folder) ? string.Empty : Folder.Trim();
+    public string FolderKey => Folders.Clean(Folder);
     public string Token => (Name ?? string.Empty).Trim();
 
     public List<Card> In(Section section)
@@ -113,5 +131,37 @@ public sealed class FlowItem
             if (card.Section == section) list.Add(card);
         }
         return list;
+    }
+}
+
+public static class Folders
+{
+    public static string Clean(string? path)
+    {
+        var parts = (path ?? string.Empty).Split('/', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+        return string.Join('/', parts);
+    }
+
+    public static string Parent(string path)
+    {
+        var clean = Clean(path);
+        var i = clean.LastIndexOf('/');
+        return i < 0 ? string.Empty : clean[..i];
+    }
+
+    public static string Leaf(string path)
+    {
+        var clean = Clean(path);
+        var i = clean.LastIndexOf('/');
+        return i < 0 ? clean : clean[(i + 1)..];
+    }
+
+    public static bool Under(string path, string folder)
+    {
+        var p = Clean(path);
+        var f = Clean(folder);
+        if (f.Length == 0) return true;
+        return p.Equals(f, StringComparison.OrdinalIgnoreCase)
+            || p.StartsWith(f + "/", StringComparison.OrdinalIgnoreCase);
     }
 }

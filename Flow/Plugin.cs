@@ -24,7 +24,7 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] internal static IPluginLog Log { get; private set; } = null!;
     [PluginService] internal static IGameConfig GameConfig { get; private set; } = null!;
 
-    public const string AppVersion = "0.1.0.0";
+    public const string AppVersion = "0.2.0.0";
     private const string CommandName = "/flow";
     private const string CommandAlias = "/fl";
 
@@ -37,7 +37,8 @@ public sealed class Plugin : IDalamudPlugin
     private readonly ConfigWindow configWindow;
     private readonly AskWindow askWindow;
     private bool paused;
-    private DateTime? pauseUntil;
+    private TimeSpan? pauseUntil;
+    private int askSeen;
 
     public Plugin()
     {
@@ -45,6 +46,7 @@ public sealed class Plugin : IDalamudPlugin
         Configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
         if (Configuration.PollSec <= 0) Configuration.PollSec = 0.4f;
         Engine = new Engine(Configuration);
+        Eval.PluginLoaded = Bridges.PluginLoaded;
 
         mainWindow = new MainWindow(this);
         configWindow = new ConfigWindow(this);
@@ -98,7 +100,8 @@ public sealed class Plugin : IDalamudPlugin
 
     private void OnFramework(IFramework _)
     {
-        if (paused && pauseUntil is DateTime until && DateTime.Now >= until)
+        Engine.Advance(Framework.UpdateDelta);
+        if (paused && pauseUntil is TimeSpan until && Engine.Clock >= until)
         {
             paused = false;
             pauseUntil = null;
@@ -112,12 +115,19 @@ public sealed class Plugin : IDalamudPlugin
         }
 
         if (paused) return;
-        var asks = Engine.Pending.Count;
         Engine.Tick(false);
-        if (Engine.Pending.Count > asks) askWindow.IsOpen = true;
+        // Open only for a new ask. An ask that survives a zone line does not reopen the window.
+        if (Engine.AskSerial != askSeen)
+        {
+            askSeen = Engine.AskSerial;
+            if (Engine.Waiting > 0) askWindow.IsOpen = true;
+        }
     }
 
-    private void OnTerritory(uint _) => Engine.Tick(true);
+    private void OnTerritory(uint _)
+    {
+        if (!paused) Engine.Tick(true);
+    }
 
     private void OnLogout(int type, int code) => Engine.Reset();
 
@@ -130,7 +140,7 @@ public sealed class Plugin : IDalamudPlugin
         {
             case "help":
                 Notify("/flow — window");
-                Notify("/fl Name — run Do once");
+                Notify("/fl Name — run Do once (one-shot, skips slotted cards)");
                 Notify("/fl stop Name — After, then revert");
                 Notify("/fl why Name — conditions");
                 Notify("/fl dry Name — Do list");
@@ -147,7 +157,7 @@ public sealed class Plugin : IDalamudPlugin
                 paused = true;
                 if (parts.Length > 1 && int.TryParse(parts[1], out var secs) && secs > 0)
                 {
-                    pauseUntil = DateTime.Now.AddSeconds(secs);
+                    pauseUntil = Engine.Clock + TimeSpan.FromSeconds(secs);
                     Notify($"Paused {secs}s.");
                 }
                 else
@@ -199,7 +209,7 @@ public sealed class Plugin : IDalamudPlugin
                     break;
                 }
                 Engine.RunOnce(flow);
-                Notify($"Ran {flow.Name}");
+                Notify($"Ran {flow.Name} once. One-shot: nothing latches, and slotted cards are skipped unless the flow is on.");
                 break;
             }
         }

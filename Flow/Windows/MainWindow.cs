@@ -7,13 +7,24 @@ using Dalamud.Interface.Windowing;
 
 namespace Flow.Windows;
 
-public sealed class MainWindow : Window
+public sealed partial class MainWindow : Window
 {
+    private const string DragType = "FLOW_ITEM";
+    private static readonly Vector4 Green = new(0.45f, 0.9f, 0.55f, 1);
+    private static readonly Vector4 Teal = new(0.45f, 0.85f, 0.75f, 1);
+    private static readonly Vector4 Amber = new(0.95f, 0.75f, 0.35f, 1);
+    private static readonly Vector4 Red = new(0.95f, 0.45f, 0.4f, 1);
+
     private readonly Plugin plugin;
     private string filter = string.Empty;
     private string newName = string.Empty;
+    private string newFolder = string.Empty;
     private string? selectedId;
     private string? selectedCard;
+    private string? dragId;
+    private string? dryFor;
+    private bool showImport;
+    private int importKind;
     private string importText = string.Empty;
     private string importMsg = string.Empty;
 
@@ -23,13 +34,15 @@ public sealed class MainWindow : Window
         SizeConstraints = new WindowSizeConstraints
         {
             MinimumSize = new Vector2(1080, 640),
-            MaximumSize = new Vector2(1900, 1400),
+            MaximumSize = new Vector2(2400, 1600),
         };
     }
 
     public void OpenFlow(string id)
     {
         selectedId = id;
+        selectedCard = null;
+        showImport = false;
         IsOpen = true;
     }
 
@@ -40,7 +53,10 @@ public sealed class MainWindow : Window
         var enabled = cfg.Enabled;
         if (ImGui.Checkbox("Enabled", ref enabled)) { cfg.Enabled = enabled; cfg.Save(); }
         ImGui.SameLine();
-        if (ImGui.Button("Ask")) plugin.OpenAsk();
+        var waiting = plugin.Engine.Waiting;
+        if (waiting > 0) ImGui.PushStyleColor(ImGuiCol.Text, Amber);
+        if (ImGui.Button(waiting > 0 ? $"Ask ({waiting})###ask" : "Ask###ask")) plugin.OpenAsk();
+        if (waiting > 0) ImGui.PopStyleColor();
         ImGui.SameLine();
         if (ImGui.Button("Settings")) plugin.ToggleConfig();
         ImGui.SameLine();
@@ -48,11 +64,11 @@ public sealed class MainWindow : Window
         ImGui.Separator();
 
         var avail = ImGui.GetContentRegionAvail();
-        ImGui.BeginChild("list", new Vector2(250, avail.Y), true);
+        ImGui.BeginChild("list", new Vector2(270, avail.Y), true);
         DrawList(cfg);
         ImGui.EndChild();
         ImGui.SameLine();
-        ImGui.BeginChild("graph", new Vector2(Math.Max(360, avail.X - 580), avail.Y), true);
+        ImGui.BeginChild("graph", new Vector2(Math.Max(380, avail.X - 270 - 400), avail.Y), true);
         DrawGraph(cfg);
         ImGui.EndChild();
         ImGui.SameLine();
@@ -60,6 +76,8 @@ public sealed class MainWindow : Window
         DrawInspector(cfg);
         ImGui.EndChild();
     }
+
+    // ---------- list ----------
 
     private void DrawList(Configuration cfg)
     {
@@ -70,36 +88,145 @@ public sealed class MainWindow : Window
         ImGui.SameLine();
         if (ImGui.Button("Add") && !string.IsNullOrWhiteSpace(newName))
         {
-            var flow = new FlowItem { Name = newName.Trim(), Enabled = false, Mode = RunMode.Off };
-            cfg.Flows.Add(flow);
-            cfg.Save();
+            var flow = new FlowItem { Name = newName.Trim(), Enabled = false, Mode = RunMode.Auto, Folder = CurrentFolder(cfg) };
             newName = string.Empty;
-            OpenFlow(flow.Id);
+            Add(cfg, flow);
         }
 
-        if (ImGui.Button("Duty template")) Add(cfg, Catalog.DutyTemplate());
+        if (ImGui.Button("Templates")) ImGui.OpenPopup("templates");
+        if (ImGui.BeginPopup("templates"))
+        {
+            ImGui.TextDisabled("Templates open off. Fill the blank fields to turn them on.");
+            if (ImGui.Selectable("Duty: swap plugin collections")) Add(cfg, Catalog.DutyTemplate());
+            if (ImGui.Selectable("Town: search comment in town")) Add(cfg, Catalog.TownTemplate());
+            if (ImGui.Selectable("Housing: at a plot")) Add(cfg, Catalog.HousingTemplate());
+            if (ImGui.Selectable("Schedule: weekday evenings")) Add(cfg, Catalog.ScheduleTemplate());
+            ImGui.EndPopup();
+        }
         ImGui.SameLine();
-        if (ImGui.Button("Town template")) Add(cfg, Catalog.TownTemplate());
+        if (ImGui.Button("Import"))
+        {
+            showImport = true;
+            selectedCard = null;
+        }
+
+        ImGui.SetNextItemWidth(-64);
+        ImGui.InputTextWithHint("##folder", "New folder (a/b)", ref newFolder, 80);
+        ImGui.SameLine();
+        if (ImGui.Button("Folder") && Folders.Clean(newFolder).Length > 0)
+        {
+            var path = Folders.Clean(newFolder);
+            if (!cfg.Folders.Contains(path, StringComparer.OrdinalIgnoreCase)) cfg.Folders.Add(path);
+            newFolder = string.Empty;
+            cfg.Save();
+        }
 
         ImGui.Separator();
-        foreach (var group in cfg.Flows.GroupBy(f => f.FolderKey).OrderBy(g => g.Key))
+        ImGui.BeginChild("tree", Vector2.Zero, false);
+        ImGui.TextDisabled("Drag a flow onto a folder.");
+        ImGui.Selectable("All flows (top level)##root", false);
+        DropTarget(cfg, string.Empty);
+        DrawFolder(cfg, string.Empty, AllFolders(cfg));
+        ImGui.EndChild();
+    }
+
+    private void DrawFolder(Configuration cfg, string path, List<string> all)
+    {
+        foreach (var child in all.Where(f => Folders.Parent(f).Equals(path, StringComparison.OrdinalIgnoreCase)))
         {
-            if (group.Key.Length > 0) ImGui.TextDisabled(group.Key);
-            foreach (var flow in group)
+            var count = cfg.Flows.Count(f => Folders.Under(f.FolderKey, child));
+            var open = ImGui.TreeNodeEx("folder:" + child, ImGuiTreeNodeFlags.DefaultOpen | ImGuiTreeNodeFlags.SpanAvailWidth, $"{Folders.Leaf(child)}  ({count})");
+            DropTarget(cfg, child);
+            if (ImGui.BeginPopupContextItem("ctx:" + child, ImGuiPopupFlags.MouseButtonRight))
             {
-                if (filter.Length > 0 && !flow.Name.Contains(filter, StringComparison.OrdinalIgnoreCase)) continue;
-                var on = plugin.Engine.IsActive(flow.Id);
-                if (on) ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(0.45f, 0.85f, 0.75f, 1));
-                var label = flow.Enabled ? flow.Name : flow.Name + "  ·  off";
-                if (ImGui.Selectable(label + "##" + flow.Id, flow.Id == selectedId))
+                if (ImGui.Selectable("Remove folder (flows move up)"))
                 {
-                    selectedId = flow.Id;
-                    selectedCard = null;
+                    var parent = Folders.Parent(child);
+                    foreach (var flow in cfg.Flows.Where(f => Folders.Under(f.FolderKey, child)))
+                        flow.Folder = Folders.Clean(parent + "/" + flow.FolderKey[child.Length..]);
+                    cfg.Folders.RemoveAll(f => Folders.Under(f, child));
+                    cfg.Save();
                 }
-                if (on) ImGui.PopStyleColor();
+                ImGui.EndPopup();
             }
+            if (!open) continue;
+            DrawFolder(cfg, child, all);
+            ImGui.TreePop();
+        }
+
+        foreach (var flow in cfg.Flows.Where(f => f.FolderKey.Equals(path, StringComparison.OrdinalIgnoreCase))
+                     .OrderByDescending(f => f.Priority).ThenBy(f => f.Name, StringComparer.OrdinalIgnoreCase).ToList())
+        {
+            FlowRow(flow);
         }
     }
+
+    private void FlowRow(FlowItem flow)
+    {
+        if (filter.Length > 0 && !flow.Name.Contains(filter, StringComparison.OrdinalIgnoreCase)) return;
+        var engine = plugin.Engine;
+        var on = engine.IsActive(flow.Id);
+        var asking = engine.Pending.Contains(flow.Id);
+        if (on) ImGui.TextColored(Green, "●");
+        else if (asking) ImGui.TextColored(Amber, "●");
+        else ImGui.TextDisabled("○");
+        ImGui.SameLine();
+
+        var tail = !flow.Enabled ? "  · off"
+            : on ? "  · on"
+            : asking ? "  · asks"
+            : engine.IsHeld(flow.Id) ? "  · held"
+            : string.Empty;
+        if (on) ImGui.PushStyleColor(ImGuiCol.Text, Teal);
+        if (ImGui.Selectable($"{flow.Name}{tail}##{flow.Id}", flow.Id == selectedId))
+        {
+            selectedId = flow.Id;
+            selectedCard = null;
+            showImport = false;
+        }
+        if (on) ImGui.PopStyleColor();
+
+        if (ImGui.BeginDragDropSource())
+        {
+            dragId = flow.Id;
+            ImGui.SetDragDropPayload(DragType, ReadOnlySpan<byte>.Empty, ImGuiCond.None);
+            ImGui.TextUnformatted(flow.Name);
+            ImGui.EndDragDropSource();
+        }
+    }
+
+    private void DropTarget(Configuration cfg, string folder)
+    {
+        if (!ImGui.BeginDragDropTarget()) return;
+        var payload = ImGui.AcceptDragDropPayload(DragType, ImGuiDragDropFlags.None);
+        if (!payload.IsNull && dragId is not null)
+        {
+            var flow = cfg.Flows.Find(f => f.Id == dragId);
+            if (flow is not null)
+            {
+                flow.Folder = folder;
+                cfg.Save();
+            }
+            dragId = null;
+        }
+        ImGui.EndDragDropTarget();
+    }
+
+    private static List<string> AllFolders(Configuration cfg)
+    {
+        var set = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
+        void AddPath(string path)
+        {
+            for (var p = Folders.Clean(path); p.Length > 0; p = Folders.Parent(p)) set.Add(p);
+        }
+        foreach (var f in cfg.Folders) AddPath(f);
+        foreach (var flow in cfg.Flows) AddPath(flow.FolderKey);
+        return set.ToList();
+    }
+
+    private string CurrentFolder(Configuration cfg) => cfg.Flows.Find(f => f.Id == selectedId)?.FolderKey ?? string.Empty;
+
+    // ---------- graph ----------
 
     private void DrawGraph(Configuration cfg)
     {
@@ -107,48 +234,77 @@ public sealed class MainWindow : Window
         if (flow is null)
         {
             ImGui.TextDisabled("Pick a flow, or add one.");
-            ImGui.TextWrapped("When decides. Do runs on the way in. Until can end it early. After runs on the way out.");
+            ImGui.TextWrapped("When decides. Do runs on the way in. Until can end it early. After runs on the way out, then Revert puts slotted values back.");
             return;
         }
 
+        var engine = plugin.Engine;
+        var missing = Catalog.Missing(flow);
         var enabled = flow.Enabled;
+        if (missing.Count > 0 && !enabled) ImGui.BeginDisabled();
         if (ImGui.Checkbox("On", ref enabled)) { flow.Enabled = enabled; cfg.Save(); }
+        if (missing.Count > 0 && !enabled)
+        {
+            ImGui.EndDisabled();
+            if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled)) ImGui.SetTooltip("Fill the blank fields first.");
+        }
         ImGui.SameLine();
         var mode = (int)flow.Mode;
-        ImGui.SetNextItemWidth(110);
+        ImGui.SetNextItemWidth(90);
         string[] modes = ["Off", "Ask", "Auto"];
         if (ImGui.Combo("##mode", ref mode, modes, modes.Length)) { flow.Mode = (RunMode)mode; cfg.Save(); }
+        Tip("Off never starts. Ask offers it in the Ask window. Auto starts on its own.");
         ImGui.SameLine();
         var stop = (int)flow.OnStop;
-        ImGui.SetNextItemWidth(110);
+        ImGui.SetNextItemWidth(90);
         string[] stops = ["Revert", "Keep"];
         if (ImGui.Combo("##stop", ref stop, stops, stops.Length)) { flow.OnStop = (StopMode)stop; cfg.Save(); }
+        Tip("Revert puts back settings, status, glamour, and Penumbra mods this flow changed, after After runs. Keep leaves them.");
         ImGui.SameLine();
-        if (ImGui.Button("Run Do")) plugin.Engine.RunOnce(flow);
+        if (ImGui.Button("Run once")) plugin.Engine.RunOnce(flow);
+        Tip("One-shot. Runs Do now without turning the flow on. Slotted cards are skipped unless the flow is on.");
         ImGui.SameLine();
         if (ImGui.Button("Stop")) plugin.Engine.Stop(flow, false);
+        Tip("Runs After and reverts. The flow stays off until When goes false.");
+        ImGui.SameLine();
+        if (ImGui.Button(dryFor == flow.Id ? "Hide dry run" : "Dry run")) dryFor = dryFor == flow.Id ? null : flow.Id;
+
+        var state = engine.IsActive(flow.Id) ? ("On", Green)
+            : engine.Pending.Contains(flow.Id) ? ("Waiting for a yes", Amber)
+            : engine.IsHeld(flow.Id) ? ("Held until When goes false", Amber)
+            : engine.IsRunning(flow.Id) ? ("Finishing", Teal)
+            : ("Not running", new Vector4(0.6f, 0.6f, 0.6f, 1));
+        ImGui.TextColored(state.Item2, state.Item1);
+        foreach (var line in missing) ImGui.TextColored(Amber, line);
 
         var name = flow.Name;
+        ImGui.SetNextItemWidth(220);
         if (ImGui.InputText("Name", ref name, 80)) { flow.Name = name; cfg.Save(); }
-        var folder = flow.Folder;
-        ImGui.SetNextItemWidth(180);
-        if (ImGui.InputText("Folder", ref folder, 60)) { flow.Folder = folder; cfg.Save(); }
         ImGui.SameLine();
         var priority = flow.Priority;
-        ImGui.SetNextItemWidth(80);
+        ImGui.SetNextItemWidth(90);
         if (ImGui.InputInt("Priority", ref priority)) { flow.Priority = priority; cfg.Save(); }
+        Tip("Higher priority wins a slot two flows both want.");
+
+        var folder = flow.Folder;
+        ImGui.SetNextItemWidth(220);
+        if (ImGui.InputText("Folder", ref folder, 80)) { flow.Folder = folder; cfg.Save(); }
+        ImGui.SameLine();
         var hold = flow.HoldSec;
         ImGui.SetNextItemWidth(120);
         if (ImGui.SliderFloat("Hold", ref hold, 0, 30, "%.1f s")) { flow.HoldSec = hold; cfg.Save(); }
+        Tip("When must stay true this long before Do runs.");
+
+        var quiet = flow.IgnoreQuiet ? 1 : 0;
+        string[] quiets = ["Use quiet options", "Ignore quiet options"];
+        ImGui.SetNextItemWidth(220);
+        if (ImGui.Combo("Quiet", ref quiet, quiets, quiets.Length)) { flow.IgnoreQuiet = quiet == 1; cfg.Save(); }
+        Tip("Quiet options in Settings hold flows in combat, cutscenes, duties, and zone lines. A duty flow should ignore them.");
+
         var notes = flow.Notes;
-        if (ImGui.InputTextMultiline("##notes", ref notes, 400, new Vector2(-1, 48))) { flow.Notes = notes; cfg.Save(); }
+        if (ImGui.InputTextMultiline("##notes", ref notes, 600, new Vector2(-1, 44))) { flow.Notes = notes; cfg.Save(); }
 
-        var whenJoin = flow.WhenJoin == Join.All;
-        if (ImGui.Checkbox("When is all", ref whenJoin)) { flow.WhenJoin = whenJoin ? Join.All : Join.Any; cfg.Save(); }
-        ImGui.SameLine();
-        var untilAny = flow.UntilJoin == Join.Any;
-        if (ImGui.Checkbox("Until is any", ref untilAny)) { flow.UntilJoin = untilAny ? Join.Any : Join.All; cfg.Save(); }
-
+        ImGui.Spacing();
         var boxes = new List<(Vector2 Top, Vector2 Bottom)>();
         DrawSection(cfg, flow, Section.When, boxes);
         DrawSection(cfg, flow, Section.Do, boxes);
@@ -157,261 +313,192 @@ public sealed class MainWindow : Window
         var draw = ImGui.GetWindowDrawList();
         var color = ImGui.GetColorU32(new Vector4(0.45f, 0.75f, 0.68f, 0.9f));
         for (var i = 1; i < boxes.Count; i++)
+        {
             draw.AddLine(boxes[i - 1].Bottom, boxes[i].Top, color, 2f);
+            draw.AddTriangleFilled(boxes[i].Top, boxes[i].Top + new Vector2(-5, -7), boxes[i].Top + new Vector2(5, -7), color);
+        }
 
+        if (dryFor == flow.Id)
+        {
+            ImGui.Spacing();
+            ImGui.TextDisabled("Dry run of Do. Nothing is sent.");
+            foreach (var line in engine.Dry(flow)) ImGui.TextUnformatted(line);
+        }
+
+        ImGui.Spacing();
         if (ImGui.Button("Copy JSON")) ImGui.SetClipboardText(Share.One(flow));
         ImGui.SameLine();
-        if (ImGui.Button("Delete flow"))
+        if (ImGui.Button("Duplicate") && Share.TryRead(Share.One(flow), out var copies, out _))
         {
-            plugin.Engine.Stop(flow, true);
+            var copy = copies[0];
+            copy.Id = Guid.NewGuid().ToString("N");
+            foreach (var card in copy.Cards) card.Id = Guid.NewGuid().ToString("N");
+            copy.Name += " copy";
+            copy.Enabled = false;
+            Add(cfg, copy);
+        }
+        ImGui.SameLine();
+        if (ImGui.Button("Delete flow") && ImGui.GetIO().KeyShift)
+        {
+            plugin.Engine.Forget(flow);
             cfg.Flows.Remove(flow);
             selectedId = null;
             selectedCard = null;
             cfg.Save();
         }
+        Tip("Hold Shift and click to delete.");
     }
 
     private void DrawSection(Configuration cfg, FlowItem flow, Section section, List<(Vector2 Top, Vector2 Bottom)> boxes)
     {
         ImGui.PushID((int)section);
-        var title = section switch
+        var cards = flow.In(section);
+        var engine = plugin.Engine;
+        var world = engine.Last;
+        var condition = section is Section.When or Section.Until;
+
+        var start = ImGui.GetCursorScreenPos();
+        var width = ImGui.GetContentRegionAvail().X;
+        var pad = ImGui.GetStyle().FramePadding;
+        ImGui.SetCursorScreenPos(start + pad);
+        ImGui.BeginGroup();
+
+        ImGui.TextUnformatted(section.ToString());
+        if (condition && cards.Count > 1)
         {
-            Section.When => "When",
-            Section.Do => "Do",
-            Section.Until => "Until",
-            _ => "After",
-        };
-        ImGui.TextUnformatted(title);
+            ImGui.SameLine();
+            var join = section == Section.Until ? flow.UntilJoin : flow.WhenJoin;
+            if (ImGui.SmallButton(join == Join.All ? "all of these" : "any of these"))
+            {
+                var flip = join == Join.All ? Join.Any : Join.All;
+                if (section == Section.Until) flow.UntilJoin = flip;
+                else flow.WhenJoin = flip;
+                cfg.Save();
+            }
+        }
+        if (condition && cards.Count > 0 && world.LoggedIn)
+        {
+            ImGui.SameLine();
+            var whole = Eval.SectionMatches(flow, section, world);
+            ImGui.TextColored(whole ? Green : new Vector4(0.6f, 0.6f, 0.6f, 1), whole ? "true now" : "false now");
+        }
         ImGui.SameLine();
-        if (ImGui.Button("+")) ImGui.OpenPopup("add");
+        if (ImGui.SmallButton("+ add")) ImGui.OpenPopup("add");
         if (ImGui.BeginPopup("add"))
         {
             foreach (var desc in Catalog.For(section))
             {
-                if (!ImGui.Selectable(desc.Label)) continue;
-                var card = Catalog.Make(section, desc.Type);
-                flow.Cards.Add(card);
-                selectedCard = card.Id;
-                cfg.Save();
+                if (ImGui.Selectable($"{desc.Label}##{desc.Type}"))
+                {
+                    var card = Catalog.Make(section, desc.Type);
+                    flow.Cards.Add(card);
+                    selectedCard = card.Id;
+                    cfg.Save();
+                }
+                ImGui.SameLine(190);
+                ImGui.TextDisabled(desc.Hint);
             }
             ImGui.EndPopup();
         }
 
-        var cards = flow.In(section);
-        var height = 28f + Math.Max(1, cards.Count) * 24f;
-        ImGui.BeginChild("node", new Vector2(-1, height), true);
-        if (cards.Count == 0) ImGui.TextDisabled("Empty");
+        if (cards.Count == 0)
+        {
+            ImGui.TextDisabled(section switch
+            {
+                Section.When => "Empty, so the flow stays off.",
+                Section.Until => "Empty. The flow ends when When goes false.",
+                Section.Do => "Empty. Nothing runs on the way in.",
+                _ => "Empty. Revert still puts slotted values back.",
+            });
+        }
+
+        var right = start.X + width - pad.X * 2;
         for (var i = 0; i < cards.Count; i++)
         {
             var card = cards[i];
-            var live = (section is Section.When or Section.Until)
-                && plugin.Engine.Last.LoggedIn
-                && Eval.CardMatches(card, plugin.Engine.Last);
-            if (live) ImGui.TextColored(new Vector4(0.45f, 0.9f, 0.55f, 1), "●");
-            else ImGui.TextDisabled("○");
-            ImGui.SameLine();
-            var key = Catalog.Key(section, i);
-            if (ImGui.Selectable($"{key}   {card.Label}", card.Id == selectedCard))
-                selectedCard = card.Id;
+            var label = $"{Catalog.Key(section, i)}  {card.Label}";
+            var chipWidth = ChipWidth(label, condition);
+            if (i > 0)
+            {
+                ImGui.SameLine();
+                if (ImGui.GetCursorScreenPos().X + chipWidth > right) ImGui.NewLine();
+            }
+            Chip(cfg, flow, card, label, condition, world, i, cards.Count);
         }
-        ImGui.EndChild();
-        var min = ImGui.GetItemRectMin();
+
+        ImGui.EndGroup();
         var max = ImGui.GetItemRectMax();
-        boxes.Add((new Vector2((min.X + max.X) * 0.5f, min.Y), new Vector2((min.X + max.X) * 0.5f, max.Y)));
+        var min = start;
+        var bottom = new Vector2(start.X + width, max.Y + pad.Y);
+        var draw = ImGui.GetWindowDrawList();
+        draw.AddRect(min, bottom, ImGui.GetColorU32(ImGuiCol.Border), 4f);
+        ImGui.SetCursorScreenPos(new Vector2(start.X, bottom.Y));
+        ImGui.Dummy(new Vector2(width, 18));
+        boxes.Add((new Vector2(min.X + width * 0.5f, min.Y), new Vector2(min.X + width * 0.5f, bottom.Y)));
         ImGui.PopID();
     }
 
-    private void DrawInspector(Configuration cfg)
+    private static float ChipWidth(string label, bool condition)
     {
-        var flow = cfg.Flows.Find(f => f.Id == selectedId);
-        if (flow is null)
+        var style = ImGui.GetStyle();
+        var small = ImGui.CalcTextSize("x").X + style.FramePadding.X * 2 + 2;
+        var dot = condition ? ImGui.CalcTextSize("●").X + style.ItemSpacing.X : 0;
+        var controls = small * (condition ? 4 : 3);
+        return dot + ImGui.CalcTextSize(label).X + style.FramePadding.X * 2 + controls + style.ItemSpacing.X * 2;
+    }
+
+    private void Chip(Configuration cfg, FlowItem flow, Card card, string label, bool condition, World world, int index, int count)
+    {
+        ImGui.PushID(card.Id);
+        ImGui.BeginGroup();
+        if (condition)
         {
-            DrawImport(cfg);
-            return;
+            var live = world.LoggedIn && Eval.CardMatches(card, world);
+            if (live) ImGui.TextColored(Green, "●");
+            else ImGui.TextDisabled("○");
+            ImGui.SameLine(0, 4);
         }
 
-        var card = flow.Cards.Find(c => c.Id == selectedCard);
-        if (card is null)
+        var error = plugin.Engine.Error(card.Id);
+        var missing = Catalog.Missing(card) is not null;
+        var selected = card.Id == selectedCard;
+        var colors = 0;
+        if (selected) { ImGui.PushStyleColor(ImGuiCol.Button, ImGui.GetColorU32(ImGuiCol.ButtonActive)); colors++; }
+        if (error is not null || missing) { ImGui.PushStyleColor(ImGuiCol.Text, error is not null ? Red : Amber); colors++; }
+        if (ImGui.Button(label)) selectedCard = card.Id;
+        if (colors > 0) ImGui.PopStyleColor(colors);
+        if (ImGui.IsItemHovered())
         {
-            ImGui.TextDisabled("Select a card.");
-            foreach (var line in plugin.Engine.Why(flow))
-                ImGui.TextWrapped(line);
-            ImGui.Separator();
-            DrawImport(cfg);
-            return;
+            if (error is not null) ImGui.SetTooltip(error);
+            else if (missing) ImGui.SetTooltip("Needs a " + Catalog.Missing(card));
         }
 
-        ImGui.TextUnformatted(card.Label);
-        var index = flow.Cards.IndexOf(card);
-        if (ImGui.Button("Up") && index > 0) Move(cfg, flow, index, -1);
-        ImGui.SameLine();
-        if (ImGui.Button("Down") && index >= 0 && index < flow.Cards.Count - 1) Move(cfg, flow, index, 1);
-        ImGui.SameLine();
-        if (ImGui.Button("Remove"))
+        if (condition)
+        {
+            ImGui.SameLine(0, 2);
+            if (ImGui.SmallButton(card.Not ? "!##not" : "=##not")) { card.Not = !card.Not; cfg.Save(); }
+            Tip(card.Not ? "Negated. Click to match normally." : "Click to negate.");
+        }
+        ImGui.SameLine(0, 2);
+        if (ImGui.SmallButton("<") && index > 0) Move(cfg, flow, card, -1);
+        ImGui.SameLine(0, 2);
+        if (ImGui.SmallButton(">") && index < count - 1) Move(cfg, flow, card, 1);
+        ImGui.SameLine(0, 2);
+        if (ImGui.SmallButton("x"))
         {
             flow.Cards.Remove(card);
-            selectedCard = null;
-            cfg.Save();
-            return;
-        }
-
-        if (CardType.IsCondition(card.Type))
-        {
-            var not = card.Not;
-            if (ImGui.Checkbox("Not", ref not)) { card.Not = not; cfg.Save(); }
-        }
-
-        Edit(cfg, card);
-        ImGui.Separator();
-        ImGui.TextDisabled("Why");
-        foreach (var line in plugin.Engine.Why(flow))
-            ImGui.TextWrapped(line);
-    }
-
-    private void Edit(Configuration cfg, Card card)
-    {
-        switch (card.Type)
-        {
-            case CardType.State:
-                Combo(cfg, card, "State", Catalog.States, v => card.Value = v, card.Value);
-                break;
-            case CardType.Place:
-                Combo(cfg, card, "Place", Catalog.Places, v => card.Value = v, card.Value);
-                break;
-            case CardType.Duty:
-                Combo(cfg, card, "Duty", Catalog.Duties, v => card.Value = v, card.Value);
-                break;
-            case CardType.Role:
-                Combo(cfg, card, "Role", Catalog.Roles, v => card.Value = v, card.Value);
-                break;
-            case CardType.Target:
-                Combo(cfg, card, "Target", Catalog.Targets, v => card.Value = v, card.Value);
-                break;
-            case CardType.Job:
-            case CardType.Zone:
-            case CardType.World:
-            case CardType.DataCenter:
-            case CardType.Status:
-            case CardType.Plugin:
-            case CardType.Weekday:
-                Text(cfg, card, "Value", v => card.Value = v, card.Value, "WHM|SCH   Limsa   Aether   sat,sun");
-                break;
-            case CardType.Party:
-            case CardType.Nearby:
-            case CardType.Level:
-                Text(cfg, card, "Compare", v => card.Value = v, card.Value, ">=4");
-                break;
-            case CardType.Time:
-                Text(cfg, card, "Range", v => card.Value = v, card.Value, "18:00-06:00 or et 17-22");
-                break;
-            case CardType.Command:
-                Text(cfg, card, "Command", v => card.Value = v, card.Value, "/echo hello");
-                Int(cfg, card, "Repeat", card.Repeat, v => card.Repeat = Math.Clamp(v, 1, 30));
-                Int(cfg, card, "Gap ms", card.WaitMs, v => card.WaitMs = Math.Max(0, v));
-                break;
-            case CardType.Wait:
-                Int(cfg, card, "Milliseconds", card.WaitMs, v => card.WaitMs = Math.Max(0, v));
-                break;
-            case CardType.Notice:
-                Text(cfg, card, "Text", v => card.Value = v, card.Value, "Duty flow");
-                break;
-            case CardType.Online:
-                Combo(cfg, card, "Status", ["online", "away", "busy", "rp", "lfp", "meld"], v => card.Value = v, card.Value);
-                break;
-            case CardType.Collection:
-                Text(cfg, card, "Collection", v => card.Value = v, card.Value, "Collection name");
-                var enableCollection = card.Flag;
-                if (ImGui.Checkbox("Enable", ref enableCollection)) { card.Flag = enableCollection; cfg.Save(); }
-                ImGui.TextDisabled(enableCollection ? "Enables the collection." : "Disables the collection.");
-                break;
-            case CardType.PluginSet:
-                Text(cfg, card, "Plugin", v => card.Value = v, card.Value, "Plugin name");
-                var enablePlugin = card.Flag;
-                if (ImGui.Checkbox("Enable##plugin", ref enablePlugin)) { card.Flag = enablePlugin; cfg.Save(); }
-                var keep = card.Permanent;
-                if (ImGui.Checkbox("Remember", ref keep)) { card.Permanent = keep; cfg.Save(); }
-                ImGui.TextDisabled(keep ? "Saved in the collection." : "Temporary. Resets when the game restarts.");
-                break;
-            case CardType.Setting:
-                EditSetting(cfg, card);
-                break;
-            case CardType.Glamour:
-                Text(cfg, card, "Design", v => card.Value = v, card.Value, "Design name");
-                if (ImGui.Button("List designs"))
-                    importMsg = string.Join(", ", Bridges.GlamourNames().Take(12));
-                if (importMsg.Length > 0) ImGui.TextWrapped(importMsg);
-                break;
-            case CardType.PenumbraMod:
-                Text(cfg, card, "Directory", v => card.Option = v, card.Option, "mod directory");
-                Text(cfg, card, "Name", v => card.Value = v, card.Value, "mod name");
-                var on = card.Flag;
-                if (ImGui.Checkbox("Enabled", ref on)) { card.Flag = on; cfg.Save(); }
-                Int(cfg, card, "Priority", card.Number, v => card.Number = v);
-                var permanent = card.Permanent;
-                if (ImGui.Checkbox("Permanent", ref permanent)) { card.Permanent = permanent; cfg.Save(); }
-                ImGui.TextDisabled(permanent ? "Writes the collection." : "Temporary, cleared with Penumbra clear temp.");
-                break;
-            case CardType.PenumbraCollection:
-                Text(cfg, card, "Collection", v => card.Value = v, card.Value, "collection name");
-                break;
-            case CardType.PenumbraReset:
-                Text(cfg, card, "Directory", v => card.Option = v, card.Option, "blank clears all temp from Flow");
-                break;
-        }
-    }
-
-    private void EditSetting(Configuration cfg, Card card)
-    {
-        var section = card.Option == "Ui" ? 1 : 0;
-        string[] sections = ["System", "Ui"];
-        if (ImGui.Combo("Section", ref section, sections, sections.Length))
-        {
-            card.Option = section == 1 ? "Ui" : "System";
+            if (selectedCard == card.Id) selectedCard = null;
             cfg.Save();
         }
-
-        var names = Catalog.Settings.Where(s => s.Section == card.Option).Select(s => s.Name).ToArray();
-        var pick = Math.Max(0, Array.IndexOf(names, card.Value));
-        if (names.Length > 0 && ImGui.Combo("Option", ref pick, names, names.Length))
-        {
-            card.Value = names[pick];
-            cfg.Save();
-        }
-        Text(cfg, card, "Name", v => card.Value = v, card.Value, "Config option");
-        Text(cfg, card, "Value", v => card.Extra = v, card.Extra, "0");
-        var hint = Catalog.Settings.FirstOrDefault(s => s.Name == card.Value);
-        if (hint is not null) ImGui.TextDisabled(hint.Hint);
+        ImGui.EndGroup();
+        ImGui.PopID();
     }
 
-    private void Text(Configuration cfg, Card card, string label, Action<string> set, string current, string hint)
+    private static void Move(Configuration cfg, FlowItem flow, Card card, int delta)
     {
-        var value = current ?? string.Empty;
-        if (!ImGui.InputTextWithHint(label, hint, ref value, 240)) return;
-        set(value);
-        cfg.Save();
-    }
-
-    private void Int(Configuration cfg, Card card, string label, int current, Action<int> set)
-    {
-        var value = current;
-        if (!ImGui.InputInt(label, ref value)) return;
-        set(value);
-        cfg.Save();
-    }
-
-    private void Combo(Configuration cfg, Card card, string label, string[] items, Action<string> set, string current)
-    {
-        var index = Math.Max(0, Array.IndexOf(items, current));
-        if (!ImGui.Combo(label, ref index, items, items.Length)) return;
-        set(items[index]);
-        cfg.Save();
-    }
-
-    private void Move(Configuration cfg, FlowItem flow, int index, int delta)
-    {
-        var card = flow.Cards[index];
         var section = flow.In(card.Section);
         var at = section.IndexOf(card);
+        if (at + delta < 0 || at + delta >= section.Count) return;
         var swap = section[at + delta];
         var i = flow.Cards.IndexOf(card);
         var j = flow.Cards.IndexOf(swap);
@@ -426,28 +513,61 @@ public sealed class MainWindow : Window
         OpenFlow(flow.Id);
     }
 
+    private static void Tip(string text)
+    {
+        if (ImGui.IsItemHovered()) ImGui.SetTooltip(text);
+    }
+
+    // ---------- import ----------
+
     private void DrawImport(Configuration cfg)
     {
-        ImGui.TextDisabled("Paste a flow");
-        ImGui.InputTextMultiline("##import", ref importText, 8000, new Vector2(-1, 120));
-        if (ImGui.Button("Import"))
+        ImGui.TextUnformatted("Import");
+        ImGui.RadioButton("Flow JSON", ref importKind, 0);
+        ImGui.SameLine();
+        ImGui.RadioButton("AndThen", ref importKind, 1);
+        ImGui.SameLine();
+        ImGui.RadioButton("StatusShift", ref importKind, 2);
+        ImGui.TextDisabled(importKind switch
         {
-            if (Share.TryRead(importText, out var flows, out var error))
+            1 => "Paste AndThen rule JSON or an AT1. code. Rules come in off, with Keep.",
+            2 => "Paste StatusShift rule JSON, its whole config, or an SS1. code. Rules come in off.",
+            _ => "Paste one flow or a list. They come in off.",
+        });
+        ImGui.InputTextMultiline("##import", ref importText, 64000, new Vector2(-1, 160));
+        if (ImGui.Button("Import##go"))
+        {
+            List<FlowItem> flows;
+            string message;
+            var ok = importKind switch
+            {
+                1 => Importers.TryAndThen(importText, out flows, out message),
+                2 => Importers.TryStatusShift(importText, out flows, out message),
+                _ => Share.TryRead(importText, out flows, out message),
+            };
+            if (ok)
             {
                 foreach (var flow in flows)
                 {
                     flow.Id = Guid.NewGuid().ToString("N");
+                    foreach (var card in flow.Cards) card.Id = Guid.NewGuid().ToString("N");
                     flow.Enabled = false;
-                    flow.Mode = RunMode.Off;
+                    if (importKind == 0) flow.Mode = RunMode.Off;
                     cfg.Flows.Add(flow);
                 }
                 cfg.Save();
-                importMsg = $"Imported {flows.Count}. They are off.";
+                importMsg = importKind == 0 ? $"Imported {flows.Count}. They are off." : message;
                 importText = string.Empty;
-                if (flows.Count > 0) OpenFlow(cfg.Flows[^1].Id);
+                if (flows.Count > 0)
+                {
+                    selectedId = flows[^1].Id;
+                    selectedCard = null;
+                }
             }
-            else importMsg = error;
+            else importMsg = message;
         }
+        ImGui.SameLine();
+        if (ImGui.Button("Close")) showImport = false;
         if (importMsg.Length > 0) ImGui.TextWrapped(importMsg);
     }
 }

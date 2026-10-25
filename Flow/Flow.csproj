@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Dalamud.NET.Sdk/15.0.0">
   <PropertyGroup>
-    <Version>0.1.0.0</Version>
+    <Version>0.2.0.0</Version>
     <Author>Shadowstar</Author>
     <Name>Flow</Name>
     <Punchline>Set up a flow. When it matches, it does the rest.</Punchline>
-    <Description>A graph of When, Do, Until, and After cards. Conditions read zone, duty, job, time, and loaded plugins. Actions write game settings, run commands and repeated macros, switch plugin collections, set online status, apply Glamourer designs, and change Penumbra mod state and priority. Slotted actions can revert when the flow stops.</Description>
+    <Description>A graph of When, Do, Until, and After cards. Conditions read zone, duty, housing address, group size, schedule, weather, mount, job, and loaded plugins. Actions write game settings, run commands and repeated macros, set the search comment and online status, switch plugin collections, apply Glamourer designs, and change Penumbra mod state and options. Slotted actions put back what they replaced when the flow stops.</Description>
     <RepoUrl>https://github.com/ShadowstarIO/Flow</RepoUrl>
     <PackageProjectUrl>https://github.com/ShadowstarIO/Flow</PackageProjectUrl>
     <IconUrl>https://raw.githubusercontent.com/ShadowstarIO/Flow/main/images/icon.png</IconUrl>

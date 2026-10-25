@@ -2,4 +2,5 @@
   <Project Path="Flow/Flow.csproj">
     <Platform Project="x64" />
   </Project>
+  <Project Path="Flow.Tests/Flow.Tests.csproj" />
 </Solution>

@@ -30,7 +30,8 @@ public sealed class ConfigWindow : Window
         var open = cfg.OpenUiOnLoad;
         if (ImGui.Checkbox("Open the window when the plugin loads", ref open)) { cfg.OpenUiOnLoad = open; changed = true; }
         ImGui.Separator();
-        ImGui.TextDisabled("Hold a flow while any of these are true. It will not start or stop.");
+        ImGui.TextDisabled("Hold a flow while any of these are true. It will not start, stop, or send its queue.");
+        ImGui.TextDisabled("A flow set to ignore quiet options runs anyway. Duty flows usually should.");
         changed |= Flag("Cutscene", cfg.QuietInCutscene, v => cfg.QuietInCutscene = v);
         changed |= Flag("Between areas", cfg.QuietBetweenAreas, v => cfg.QuietBetweenAreas = v);
         changed |= Flag("Occupied", cfg.QuietWhenOccupied, v => cfg.QuietWhenOccupied = v);
@@ -38,6 +39,7 @@ public sealed class ConfigWindow : Window
         changed |= Flag("Combat", cfg.QuietInCombat, v => cfg.QuietInCombat = v);
         changed |= Flag("Duty", cfg.QuietInDuty, v => cfg.QuietInDuty = v);
         ImGui.Separator();
+        ImGui.TextDisabled("Logging out drops the queue. A half-sent macro does not resume.");
         var poll = cfg.PollSec;
         if (ImGui.SliderFloat("Check every", ref poll, 0.15f, 5f, "%.2f s"))
         {

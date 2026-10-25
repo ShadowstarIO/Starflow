@@ -48,6 +48,9 @@ jobs:
       - name: Build
         run: dotnet build Flow.slnx --configuration Release -p:RestoreLockedMode=false
 
+      - name: Test
+        run: dotnet test Flow.Tests/Flow.Tests.csproj --configuration Release --no-build
+
       - name: Stage package
         shell: pwsh
         run: |
