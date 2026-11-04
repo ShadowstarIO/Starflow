@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="Starflow/Starflow.csproj">
+    <Platform Project="x64" />
+  </Project>
+  <Project Path="Starflow.Tests/Starflow.Tests.csproj" />
+</Solution>

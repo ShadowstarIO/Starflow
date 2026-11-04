@@ -1,8 +1,42 @@
-# Flow
+<p align="center">
+  <img src="images/icon.png" width="160" alt="Starflow icon: a gold star joined to two nodes like a constellation, on a night-blue tile" />
+</p>
 
-Set up a flow. When the conditions match, it does the rest. When they stop, it puts things back.
+<h1 align="center">Starflow</h1>
 
-Open `/flow` or `/fl`.
+<p align="center">
+  <img alt="Version 0.0.1.0" src="https://img.shields.io/badge/version-0.0.1.0-4a6fd8?style=flat-square" />
+  <img alt="Dalamud API 15" src="https://img.shields.io/badge/Dalamud-API%2015-5ac8b4?style=flat-square" />
+  <img alt=".NET 10" src="https://img.shields.io/badge/.NET-10-512bd4?style=flat-square&logo=dotnet&logoColor=white" />
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-3a3a3a?style=flat-square" /></a>
+  <img alt="Status: pre-release" src="https://img.shields.io/badge/status-pre--release-f0be5a?style=flat-square" />
+</p>
+
+<p align="center">
+  <b>Read the stars, set your course. When the realm changes, your setup follows.</b><br>
+  Set up a flow: when the conditions match, it does the rest, and when they stop, it puts things back.<br>
+  <em>Reactions, not play. Built on Dalamud.</em>
+</p>
+
+<p align="center">
+  <a href="#install"><b>Install</b></a> ·
+  <a href="#how-a-flow-works">How a flow works</a> ·
+  <a href="#safety">Safety</a> ·
+  <a href="#commands">Commands</a> ·
+  <a href="https://github.com/ShadowstarIO/xiv">All Shadowstar plugins</a>
+</p>
+
+---
+
+## Install
+
+1. In game, open `/xlsettings` → **Experimental**.
+2. Under **Custom Plugin Repositories**, add `https://raw.githubusercontent.com/ShadowstarIO/XIV/main/repo.json`, tick it, and save.
+3. Open `/xlplugins`, search for **Starflow**, and install.
+
+Open it with `/starflow`, or the short forms `/flow` and `/fl`.
+
+## How a flow works
 
 A flow is four sections, read top to bottom. Cards are the nodes.
 
@@ -13,9 +47,11 @@ A flow is four sections, read top to bottom. Cards are the nodes.
 | Until | Optional. Ends the flow while When is still true. It stays off until When goes false. |
 | After | What runs on the way out, every time. |
 
-**Conditions:** state, duty, place, zone, region, housing address, group size, party count, job, role, level, world, home or visiting, data center, schedule, clock range, weekday, weather, mount, nearby count or name, online status, target, plugin loaded.
+**Conditions:** state, duty, place, zone, region, housing address, party size (with or without chocobo and pet), job, role, level, world, home or visiting, data center, schedule, clock range, weekday, weather, mount, nearby count or name, online status, target, plugin loaded.
 
-**Actions:** commands and macros, chat notices, game settings, online status, search comment, plugin collections, one plugin on or off, Glamourer designs, Penumbra mods with their options, Penumbra collection, log out, close game. Commands, notices, and comments fill `{zone} {region} {job} {world} {home} {dc} {ward} {plot} {time} {target}`.
+**Reactions:** HP, MP, GP, or CP (yours, your target's, or the party's, as a number or percent), effects on you, your target, or the party, enemies targeting you, damage you just took (from a player or an NPC), party members down, and chat messages by channel, sender, and text.
+
+**Actions:** commands and macros, chat notices, game settings, online status, search comment, plugin collections, one plugin on or off, Glamourer designs, Penumbra mods with their options, Penumbra collection, webhooks (Discord or any URL), Lifestream travel (home, FC, apartment, inn, a world, or an aetheryte), log out, close game. Commands, notices, comments, and webhooks fill tokens such as `{zone} {job} {world} {weather}`; Help lists all of them. Text conditions take words split on `|`, or a `/regex/`. Help lists every System and UI game option with what it does.
 
 **Revert** runs after After and puts back what slotted cards replaced: game settings, online status, Glamourer, and Penumbra mods. An After card that writes the same thing wins. **Keep** leaves it, for the flow or one card. Higher priority wins a slot; the first owner's original is what comes back.
 
@@ -23,16 +59,26 @@ Collections use `/xlenablecollection` and `/xldisablecollection`. A plugin that 
 
 Nothing runs on the title screen. Logging out drops the queue; a half-sent macro does not resume. Quiet options hold flows in combat, cutscenes, duties, or zone lines; a flow can ignore them.
 
+## Safety
+
+**Reactions, not play.** A flow that reacts to HP, effects, enmity, damage, or chat cannot send combat actions or macros (`/ac`, `/action`, `/macro` and the like); Starflow holds it off and says why. A token can fill a command's arguments but never the command word itself.
+
+**Chat cards let other people trigger your flows.** Anyone who can post in the channels you pick can set off whatever that flow does: emotes, speech, looks, travel. Name the senders, keep the channels narrow, and prefer Prompt mode. How you use it is up to you.
+
+Game settings cards only write options a person would set. Game bookkeeping, such as session and login records, is hidden and never written.
+
+## Templates and imports
+
 Templates and imports open off. Import AndThen and StatusShift rules from the Import button.
 
 ## Commands
 
-- `/flow` — window
+- `/starflow` (or `/flow`, `/fl`) — window
 - `/fl Name` — run Do once (one-shot; skips slotted cards unless the flow is on)
 - `/fl stop Name` — run After and revert
 - `/fl why Name` — print each condition
 - `/fl dry Name` — print the Do stack without sending it
 - `/fl now` — print which flows are on
 - `/fl pause [seconds]` / `/fl resume`
-- `/fl ask` — flows and cards waiting for a yes
-- `/fl config` · `/fl help`
+- `/fl prompts` — flows and cards waiting for a yes
+- `/fl config` · `/fl help` (opens Help)
