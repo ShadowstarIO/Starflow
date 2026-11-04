@@ -44,7 +44,7 @@ public static class Eval
             var cards = flow.In(section);
             if (cards.Count == 0)
             {
-                yield return section == Section.When ? "When is empty, so this never starts on its own." : "Until is empty, so only When going false ends it.";
+                yield return section == Section.When ? "When is empty, so this does not start on its own." : "Until is empty, so only When going false ends it.";
                 continue;
             }
 

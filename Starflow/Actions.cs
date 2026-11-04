@@ -14,7 +14,7 @@ internal static class Actions
         {
             return card.Type switch
             {
-                CardType.Command => Tokens.HeadIsToken(card.Value) ? new ActResult(false, "The command word itself cannot come from a token.") : Cmd(Tokens.Fill(card.Value, world)),
+                CardType.Command => Tokens.HeadIsToken(card.Value) ? new ActResult(false, "The command word has to be typed, not a token.") : Cmd(Tokens.Fill(card.Value, world)),
                 CardType.Wait => new ActResult(true, "Wait"),
                 CardType.Notice => Note(Tokens.Fill(card.Value, world)),
                 CardType.SearchComment => Cmd(ChatSender.Comment(Tokens.Fill(card.Value, world))),
@@ -211,7 +211,7 @@ internal static class Actions
         var before = ReadOption(section, name);
         if (before.Length == 0)
         {
-            detail = "Not readable as a number. Starflow cannot write it.";
+            detail = "Not readable as a number, so Starflow leaves it alone.";
             return Access.Unreadable;
         }
         try
@@ -266,7 +266,7 @@ internal static class Actions
         error = string.Empty;
         if (OptionGuide.Blocked(name))
         {
-            error = $"{name} is game bookkeeping, not a setting. Starflow never writes it.";
+            error = $"{name} is game bookkeeping, not a setting, so Starflow leaves it alone.";
             return false;
         }
         if (string.IsNullOrWhiteSpace(name))

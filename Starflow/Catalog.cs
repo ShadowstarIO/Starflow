@@ -193,7 +193,7 @@ public static class Catalog
                 var gap = Missing(cards[i]);
                 if (gap is not null) list.Add($"{Key(section, i)} needs a {gap}");
                 if (reactive && cards[i].Type == CardType.Command && IsCombatCommand(cards[i].Value))
-                    list.Add($"{Key(section, i)} uses an action or macro, which a flow that reacts to combat or chat cannot send");
+                    list.Add($"{Key(section, i)} uses an action or macro, which a flow that reacts to combat or chat holds off on");
             }
         }
         return list;

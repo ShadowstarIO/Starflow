@@ -104,7 +104,7 @@ internal static class Bridges
             return false;
         }
         if (Plugin.CommandManager.ProcessCommand(head + " " + quoted)) return true;
-        error = $"{head} refused {name}. A plugin that sits in more than one collection cannot be toggled alone.";
+        error = $"{head} refused {name}. Dalamud may refuse a plugin that sits in more than one collection.";
         return false;
     }
 

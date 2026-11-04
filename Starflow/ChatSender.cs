@@ -28,7 +28,7 @@ internal static class ChatSender
         if (!command.StartsWith('/')) command = "/" + command;
         if (IsSelf(command))
         {
-            error = "A card cannot send /starflow, /flow, or /fl.";
+            error = "A card does not send /starflow, /flow, or /fl.";
             return false;
         }
 

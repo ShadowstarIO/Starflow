@@ -49,7 +49,7 @@ public sealed class HelpWindow : Window
             Bullet("Until", "Optional. Ends the flow early while When is still true. After that it waits for When to go false once before it can start again. Leave it empty and the flow simply ends when When goes false.");
             Bullet("After", "Runs once, in order, when the flow ends for any reason.");
             Para("Revert puts back what slotted Do cards replaced (game settings, online status, Glamourer, Penumbra mods), after After runs. Keep leaves them.");
-            Para("Modes: Off never starts on its own. Prompt puts the flow in Prompts and waits for a yes. Auto starts on its own.");
+            Para("Modes: Off does not start on its own. Prompt puts the flow in Prompts and waits for a yes. Auto starts on its own.");
             Para("Dry run lists each stage, Do, After, and Revert, with timings. Why says in one line why a flow is on or off, then shows every condition.");
             ImGui.EndTabItem();
         }
@@ -67,7 +67,7 @@ public sealed class HelpWindow : Window
             Code("^The ", "names that start with 'The '");
             Code("\\d+", "contains a number");
             Code("^(?!Limsa)", "anything that does not start with Limsa");
-            Para("A bad pattern shows in red under the field and simply never matches. It cannot crash the flow.");
+            Para("A bad pattern shows in red under the field and does not match anything.");
             ImGui.Separator();
             Para("Numbers compare with >=4, <8, =1, !=2, or a range 1-4.");
             Para("Clock ranges are local, or Eorzea with an et prefix: et 18:00-06:00. A range past midnight wraps.");
@@ -76,8 +76,8 @@ public sealed class HelpWindow : Window
         if (Tab("Reactions", "reactions"))
         {
             Para("Some When cards read small things from play: HP, MP, GP, and CP; effects on you, your target, or your party; enemies targeting you; damage you just took; party members who are down; and chat messages.");
-            Para("Starflow reacts to them by changing setup around you: settings, status, looks, mods, notices, webhooks, travel. It does not play for you.");
-            Ui.Wrapped(Ui.Amber, "A flow that uses any of these cards cannot send combat actions or macros (/ac, /action, /pvpaction, /blueaction, /petaction, /gaction, /macro). Starflow holds it off and says why.");
+            Para("Starflow reacts to them by changing setup around you: settings, status, looks, mods, notices, webhooks, travel. It is meant for reacting, not for playing.");
+            Ui.Wrapped(Ui.Amber, "A flow that uses any of these cards holds off on actions and macros (/ac, /action, /pvpaction, /blueaction, /petaction, /gaction, /macro) and says why.");
             ImGui.Separator();
             Bullet("HP, MP, GP, CP", "Compare a number or a percent: <50%, >=8000, =0. For you, your target, any party member, or every party member.");
             Bullet("Effect", "A buff or debuff by name, a | b, or /regex/. On you, your target, or anyone in the party.");
@@ -91,7 +91,7 @@ public sealed class HelpWindow : Window
         }
         if (Tab("Game options", "options"))
         {
-            Para("Every System and UI option a person would set, with what it does. Game bookkeeping such as session and login records is left out, and Starflow never writes it. Game setting cards can write the ones marked writable. Hover a name to copy it with a click.");
+            Para("Every System and UI option a person would set, with what it does. Game bookkeeping such as session and login records is left out. Game setting cards can write the ones marked writable. Hover a name to copy it with a click.");
             string[] sections = ["System", "UI"];
             ImGui.SetNextItemWidth(110);
             Ui.Combo("##section", ref optionSection, sections, sections.Length);
@@ -176,7 +176,7 @@ public sealed class HelpWindow : Window
             Code("/fl config", "settings");
             Code("/fl help", "this window");
             ImGui.Separator();
-            Para("Anything the game or a plugin does with a slash command can be a Command card. Browse... on that card lists every game command, emote, and plugin command. A plugin toggle that has no command and no IPC cannot be driven from outside; Starflow will not write another plugin's config file.");
+            Para("Anything the game or a plugin does with a slash command can be a Command card. Browse... on that card lists every game command, emote, and plugin command. A plugin toggle with no command and no IPC is out of reach; Starflow leaves other plugins' config files alone.");
             ImGui.EndTabItem();
         }
         ImGui.EndTabBar();

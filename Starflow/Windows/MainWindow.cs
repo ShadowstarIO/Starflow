@@ -384,7 +384,7 @@ public sealed partial class MainWindow : Window
         ImGui.SetNextItemWidth(90);
         string[] modes = ["Off", "Prompt", "Auto"];
         if (Ui.Combo("##mode", ref mode, modes, modes.Length)) { flow.Mode = (RunMode)mode; cfg.Save(); }
-        Ui.Tip("Off never starts on its own. Prompt offers it in Prompts and waits for a yes. Auto starts on its own.");
+        Ui.Tip("Off does not start on its own. Prompt offers it in Prompts and waits for a yes. Auto starts on its own.");
         Next(90);
         var stop = (int)flow.OnStop;
         ImGui.SetNextItemWidth(90);

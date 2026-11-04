@@ -236,12 +236,12 @@ internal sealed class Engine
         if (!config.Enabled) return "Starflow is turned off in the top bar.";
         if (Plugin.Instance is { IsPaused: true }) return "Starflow is paused. /fl resume";
         var missing = Catalog.Missing(flow);
-        if (missing.Count > 0) return $"it cannot run yet: {missing[0]}.";
+        if (missing.Count > 0) return $"it is not ready to run: {missing[0]}.";
         if (!flow.Enabled) return "this flow is switched off. Tick On to let it run.";
         if (flow.Mode == RunMode.Off) return "mode is Off, so it only runs from Run once.";
         if (active.Contains(flow.Id)) return "it is on. When matched, and Until has not tripped.";
         if (Quiet(world) && !flow.IgnoreQuiet) return "a quiet option in Settings is holding it right now.";
-        if (flow.In(Section.When).Count == 0) return "When is empty, so it never starts on its own.";
+        if (flow.In(Section.When).Count == 0) return "When is empty, so it does not start on its own.";
         if (!Eval.SectionMatches(flow, Section.When, world))
             return flow.WhenJoin == Join.All ? "When is false. Every When card must be true; the 'no' lines below are the ones stopping it." : "When is false. At least one When card must be true, and none are.";
         if (held.Contains(flow.Id)) return "it was stopped (by Until, Stop, or a skipped prompt) and waits for When to go false once before it can start again.";

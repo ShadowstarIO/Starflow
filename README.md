@@ -14,14 +14,14 @@
 
 <p align="center">
   <b>Read the stars, set your course. When the realm changes, your setup follows.</b><br>
-  Set up a flow: when the conditions match, it does the rest, and when they stop, it puts things back.<br>
-  <em>Reactions, not play. Built on Dalamud.</em>
+  Conditional setups for FFXIV: settings, commands, status, Glamourer, Penumbra, plugin collections, and Lifestream.<br>
+  <em>Built on Dalamud.</em>
 </p>
 
 <p align="center">
   <a href="#install"><b>Install</b></a> ·
   <a href="#how-a-flow-works">How a flow works</a> ·
-  <a href="#safety">Safety</a> ·
+  <a href="#use-with-care">Use with care</a> ·
   <a href="#commands">Commands</a> ·
   <a href="https://github.com/ShadowstarIO/xiv">All Shadowstar plugins</a>
 </p>
@@ -34,7 +34,7 @@
 2. Under **Custom Plugin Repositories**, add `https://raw.githubusercontent.com/ShadowstarIO/XIV/main/repo.json`, tick it, and save.
 3. Open `/xlplugins`, search for **Starflow**, and install.
 
-Open it with `/starflow`, or the short forms `/flow` and `/fl`.
+Open it with `/starflow` or `/flow`. `/fl` is the short form.
 
 ## How a flow works
 
@@ -55,17 +55,17 @@ A flow is four sections, read top to bottom. Cards are the nodes.
 
 **Revert** runs after After and puts back what slotted cards replaced: game settings, online status, Glamourer, and Penumbra mods. An After card that writes the same thing wins. **Keep** leaves it, for the flow or one card. Higher priority wins a slot; the first owner's original is what comes back.
 
-Collections use `/xlenablecollection` and `/xldisablecollection`. A plugin that sits in more than one collection cannot be toggled alone; Dalamud refuses it.
+Collections use `/xlenablecollection` and `/xldisablecollection`. Dalamud may refuse to toggle a plugin that sits in more than one collection.
 
 Nothing runs on the title screen. Logging out drops the queue; a half-sent macro does not resume. Quiet options hold flows in combat, cutscenes, duties, or zone lines; a flow can ignore them.
 
-## Safety
+## Use with care
 
-**Reactions, not play.** A flow that reacts to HP, effects, enmity, damage, or chat cannot send combat actions or macros (`/ac`, `/action`, `/macro` and the like); Starflow holds it off and says why. A token can fill a command's arguments but never the command word itself.
+Starflow is meant for reacting to what goes on around you, not for playing. Flows that react to HP, effects, enmity, damage, or chat hold off on actions and macros (`/ac`, `/action`, `/macro` and the like). Tokens fill a command's arguments, not the command word.
 
 **Chat cards let other people trigger your flows.** Anyone who can post in the channels you pick can set off whatever that flow does: emotes, speech, looks, travel. Name the senders, keep the channels narrow, and prefer Prompt mode. How you use it is up to you.
 
-Game settings cards only write options a person would set. Game bookkeeping, such as session and login records, is hidden and never written.
+The game settings list sticks to options a person would set. Game bookkeeping, such as session and login records, is left out.
 
 ## Templates and imports
 
@@ -73,7 +73,7 @@ Templates and imports open off. Import AndThen and StatusShift rules from the Im
 
 ## Commands
 
-- `/starflow` (or `/flow`, `/fl`) — window
+- `/starflow` or `/flow` (short: `/fl`) — window
 - `/fl Name` — run Do once (one-shot; skips slotted cards unless the flow is on)
 - `/fl stop Name` — run After and revert
 - `/fl why Name` — print each condition

@@ -62,7 +62,8 @@ public sealed class Plugin : IDalamudPlugin
         CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand) { HelpMessage = "Starflow. /fl help" });
         foreach (var alias in CommandAliases)
         {
-            try { CommandManager.AddHandler(alias, new CommandInfo(OnCommand) { HelpMessage = "Alias for /starflow." }); }
+            var help = alias == "/flow" ? "Starflow. /flow help" : "Short for /starflow.";
+            try { CommandManager.AddHandler(alias, new CommandInfo(OnCommand) { HelpMessage = help }); }
             catch (Exception ex) { Log.Verbose(ex, "Could not register {Alias}", alias); }
         }
 

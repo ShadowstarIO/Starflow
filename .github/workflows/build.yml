@@ -100,7 +100,7 @@ jobs:
           body: |
             Testing build.
 
-            Open `/starflow` after install.
+            Open `/starflow` or `/flow` after install.
           prerelease: true
           files: artifacts/Starflow.zip
 

@@ -237,11 +237,11 @@ public sealed partial class MainWindow
                 TokenHint(card.Value, here);
                 var filled = Tokens.Fill(card.Value, here);
                 if (filled.Length > ChatSender.CommentMax) ImGui.TextColored(Amber, $"Cut to {ChatSender.CommentMax} characters.");
-                Ui.Wrapped(Amber, "This is your character's search info comment, the one other players see in /search and on your profile. Starflow cannot read the comment you have now, so it cannot save or put it back. Add a second comment card to After if you want a different one on the way out.");
+                Ui.Wrapped(Amber, "This is your character's search info comment, the one other players see in /search and on your profile. Starflow does not read the comment you have now, so it does not save or put it back. Add a second comment card to After if you want a different one on the way out.");
                 break;
             case CardType.Online:
                 Combo(cfg, "Status", Catalog.StatusTokens, v => card.Value = v, card.Value);
-                ImGui.TextDisabled("Put back on stop. Statuses with no command, such as mentor, cannot be put back.");
+                ImGui.TextDisabled("Put back on stop. Statuses with no command, such as mentor, are not put back.");
                 break;
             case CardType.Collection:
                 Text(cfg, "Collection", v => card.Value = v, card.Value, "Collection name");
@@ -497,7 +497,7 @@ public sealed partial class MainWindow
         Int(cfg, "Repeat", card.Repeat, v => card.Repeat = Math.Clamp(v, 1, 30));
         Int(cfg, "Gap ms", card.WaitMs, v => card.WaitMs = Math.Max(0, v));
         if (Catalog.IsReactive(flow) && Catalog.IsCombatCommand(card.Value))
-            Ui.Wrapped(Red, "This flow reacts to HP, effects, enmity, damage, or chat, so it cannot send actions or macros. Starflow keeps it off until this card changes.");
+            Ui.Wrapped(Red, "This flow reacts to HP, effects, enmity, damage, or chat, so it holds off on actions and macros. It stays off until this card changes.");
         TokenHint(card.Value, here);
 
         var audience = GameData.Audience(card.Value);
