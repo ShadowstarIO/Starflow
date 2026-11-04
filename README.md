@@ -23,6 +23,7 @@
   <a href="#how-a-flow-works">How a flow works</a> ·
   <a href="#use-with-care">Use with care</a> ·
   <a href="#commands">Commands</a> ·
+  <a href="#disclaimer">Disclaimer</a> ·
   <a href="https://github.com/ShadowstarIO/xiv">All Shadowstar plugins</a>
 </p>
 
@@ -82,3 +83,11 @@ Templates and imports open off. Import AndThen and StatusShift rules from the Im
 - `/fl pause [seconds]` / `/fl resume`
 - `/fl prompts` — flows and cards waiting for a yes
 - `/fl config` · `/fl help` (opens Help)
+
+## Disclaimer
+
+Starflow is a configuration and convenience tool. It offers functional automation for settings, interactions, social tools, other plugins' controls, and cosmetics. It is not intended for combat, gaining an edge over other players, or anything that works against fair gameplay. Please play fair and respect the people around you.
+
+Third-party tools are not supported by Square Enix, and using them is at your own risk. You are responsible for how you set up and use your flows, including any that respond to other players. Starflow is provided as is, without warranty of any kind; see [LICENSE](LICENSE).
+
+Starflow is not affiliated with or endorsed by Square Enix. FINAL FANTASY XIV is a registered trademark of Square Enix Holdings Co., Ltd.
