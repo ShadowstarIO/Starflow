@@ -8,7 +8,7 @@
     <Description>A graph of When, Do, Until, and After cards that reacts to what is going on around you. Conditions read zone, duty, housing address, party size, job, schedule, weather, mount, HP and effects, enmity, chat messages, and loaded plugins. Actions write game settings, run commands, set the search comment and online status, switch plugin collections, apply Glamourer designs, change Penumbra mods, post to webhooks, and travel with Lifestream. Slotted actions put back what they replaced when the flow stops. Starflow never uses combat actions for you.</Description>
     <RepoUrl>https://github.com/ShadowstarIO/Starflow</RepoUrl>
     <PackageProjectUrl>https://github.com/ShadowstarIO/Starflow</PackageProjectUrl>
-    <IconUrl>https://raw.githubusercontent.com/ShadowstarIO/Starflow/main/images/icon.png</IconUrl>
+    <IconUrl>https://raw.githubusercontent.com/ShadowstarIO/Starflow/star/images/icon.png</IconUrl>
     <Tags>starflow;flow;conditions;settings;commands;penumbra;glamourer;lifestream</Tags>
     <InternalName>Starflow</InternalName>
     <ApplicableVersion>any</ApplicableVersion>
