@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+  <!-- Only the files that do not load Dalamud. -->
+  <ItemGroup>
+    <Compile Include="..\Starflow\Models.cs" Link="Source\Models.cs" />
+    <Compile Include="..\Starflow\Catalog.cs" Link="Source\Catalog.cs" />
+    <Compile Include="..\Starflow\Match.cs" Link="Source\Match.cs" />
+    <Compile Include="..\Starflow\Eval.cs" Link="Source\Eval.cs" />
+    <Compile Include="..\Starflow\World.cs" Link="Source\World.cs" />
+    <Compile Include="..\Starflow\Address.cs" Link="Source\Address.cs" />
+    <Compile Include="..\Starflow\Tokens.cs" Link="Source\Tokens.cs" />
+    <Compile Include="..\Starflow\ModOptions.cs" Link="Source\ModOptions.cs" />
+    <Compile Include="..\Starflow\Importers.cs" Link="Source\Importers.cs" />
+    <Compile Include="..\Starflow\Share.cs" Link="Source\Share.cs" />
+    <Compile Include="..\Starflow\Forecast.cs" Link="Source\Forecast.cs" />
+    <Compile Include="..\Starflow\WebhookText.cs" Link="Source\WebhookText.cs" />
+    <Compile Include="..\Starflow\Vitals.cs" Link="Source\Vitals.cs" />
+    <Compile Include="..\Starflow\OptionGuide.cs" Link="Source\OptionGuide.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+  </ItemGroup>
+</Project>

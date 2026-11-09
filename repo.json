@@ -1,0 +1,25 @@
+[
+  {
+    "Author": "Shadowstar",
+    "Name": "Starflow",
+    "Punchline": "Read the stars, set your course. When the realm changes, your setup follows.",
+    "Description": "Conditional setups that follow you around Eorzea. Switch game settings, commands, online status, Glamourer designs, Penumbra mods, plugin collections, and Lifestream travel by zone, duty, housing, party, job, schedule, weather, or chat.",
+    "InternalName": "Starflow",
+    "AssemblyVersion": "0.0.1.0",
+    "TestingAssemblyVersion": "0.0.1.0",
+    "RepoUrl": "https://github.com/ShadowstarIO/Starflow",
+    "ApplicableVersion": "any",
+    "DalamudApiLevel": 15,
+    "TestingDalamudApiLevel": 15,
+    "IsHide": false,
+    "IsTestingExclusive": false,
+    "DownloadCount": 0,
+    "LastUpdate": 0,
+    "LoadPriority": 0,
+    "IconUrl": "https://raw.githubusercontent.com/ShadowstarIO/Starflow/star/images/icon.png",
+    "DownloadLinkInstall": "https://github.com/ShadowstarIO/Starflow/releases/download/v0.0.1.0/Starflow.zip",
+    "DownloadLinkUpdate": "https://github.com/ShadowstarIO/Starflow/releases/download/v0.0.1.0/Starflow.zip",
+    "DownloadLinkTesting": "https://github.com/ShadowstarIO/Starflow/releases/download/v0.0.1.0/Starflow.zip",
+    "Tags": ["starflow", "flow", "triggers", "conditions", "profiles", "settings", "commands", "glamourer", "penumbra", "lifestream", "housing", "status"]
+  }
+]
