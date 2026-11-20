@@ -5,7 +5,7 @@
 <h1 align="center">Starflow</h1>
 
 <p align="center">
-  <img alt="Version 0.0.1.0" src="https://img.shields.io/badge/version-0.0.1.0-4a6fd8?style=flat-square" />
+  <img alt="Version 0.0.2.0" src="https://img.shields.io/badge/version-0.0.2.0-4a6fd8?style=flat-square" />
   <img alt="Dalamud API 15" src="https://img.shields.io/badge/Dalamud-API%2015-5ac8b4?style=flat-square" />
   <img alt=".NET 10" src="https://img.shields.io/badge/.NET-10-512bd4?style=flat-square&logo=dotnet&logoColor=white" />
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-3a3a3a?style=flat-square" /></a>
@@ -49,17 +49,19 @@ A flow is four sections, read top to bottom. Cards are the nodes.
 | Until | Optional. Ends the flow while When is still true. It stays off until When goes false. |
 | After | What runs on the way out, every time. |
 
-**Conditions:** state, duty, place, zone, region, housing address, party size (with or without chocobo and pet), job, role, level, world, home or visiting, data center, schedule, clock range, weekday, weather, mount, nearby count or name, online status, target, plugin loaded.
+**Conditions:** state, duty, place, zone, region, housing address, party size (with or without chocobo and pet), job, role, level, character, world, home or visiting, data center, schedule, clock range, weekday, weather, mount, nearby count or name, online status, target, plugin loaded.
 
 **Reactions:** HP, MP, GP, or CP (yours, your target's, or the party's, as a number or percent), effects on you, your target, or the party, enemies targeting you, damage you just took (from a player or an NPC), party members down, and chat messages by channel, sender, and text.
 
-**Actions:** commands and macros, chat notices, game settings, online status, search comment, plugin collections, one plugin on or off, Glamourer designs, Penumbra mods with their options, Penumbra collection, webhooks (Discord or any URL), Lifestream travel (home, FC, apartment, inn, a world, or an aetheryte), log out, close game. Commands, notices, comments, and webhooks fill tokens such as `{zone} {job} {world} {weather}`; Help lists all of them. Text conditions take words split on `|`, or a `/regex/`. Help lists every System and UI game option with what it does.
+**Actions:** commands and macros, chat notices, game settings, online status, search comment, plugin collections, one plugin on or off, Glamourer designs, Penumbra mods with their options, Penumbra collection, webhooks (Discord or any URL), Lifestream travel (home, FC, apartment, inn, a world, or an aetheryte), a chat sound only you hear (`<se.1>` to `<se.16>`), log out, close game. Commands, notices, comments, and webhooks fill tokens such as `{zone} {job} {world} {weather}`; Help lists all of them. Text conditions take words split on `|`, or a `/regex/`. Help lists every System and UI game option with what it does.
 
 **Revert** runs after After and puts back what slotted cards replaced: game settings, online status, Glamourer, and Penumbra mods. An After card that writes the same thing wins. **Keep** leaves it, for the flow or one card. Higher priority wins a slot; the first owner's original is what comes back.
 
+Each card has a small on/off box. Untick it to keep the card but skip it: it shows greyed out and struck through, and the flow runs as if it were not there. Right-click a card to switch it too. A card can also take a short description in its editor; the card shows that in place of its label, and hovering shows both.
+
 Collections use `/xlenablecollection` and `/xldisablecollection`. Dalamud may refuse to toggle a plugin that sits in more than one collection.
 
-Nothing runs on the title screen. Logging out drops the queue; a half-sent macro does not resume. Quiet options hold flows in combat, cutscenes, duties, or zone lines; a flow can ignore them.
+Nothing runs on the title screen. Logging out drops the queue; a half-sent macro does not resume. Quiet options hold flows in combat, cutscenes, duties, zone lines, while targeting or targeted, or while emoting; a flow can ignore them. Prompt mode can show a toast and play a chat sound when a flow waits for a yes. Settings can remember which flows are on for each character and switch them when you change characters.
 
 ## Use with care
 
@@ -71,9 +73,9 @@ The game settings list sticks to options a person would set. Game bookkeeping, s
 
 ## Templates and imports
 
-Templates and imports open off. Import AndThen and StatusShift rules from the Import button.
+Templates and imports open off. Import AndThen and StatusShift rules from the Import button. **Copy code** makes one short `SF1.` line for a post or message; paste it into Import to bring the flow in. Webhook URLs are left out of codes.
 
-Flows shared by me and other players are in [flows](flows). Copy one, paste it into Import, and read it through before turning it on.
+Flows shared by me and other players are in [flows](flows). In game, **Templates → Shared flows from GitHub...** lists them by name and description; pick one to preview it, then **Add**. Starflow reads that list from GitHub only when you open it. Read a flow through before turning it on.
 
 ## Commands
 
@@ -83,6 +85,7 @@ Flows shared by me and other players are in [flows](flows). Copy one, paste it i
 - `/fl why Name` — print each condition
 - `/fl dry Name` — print the Do stack without sending it
 - `/fl now` — print which flows are on
+- `/fl zone` — print where you are: place, job, world, housing, weather
 - `/fl pause [seconds]` / `/fl resume`
 - `/fl prompts` — flows and cards waiting for a yes
 - `/fl config` · `/fl help` (opens Help)

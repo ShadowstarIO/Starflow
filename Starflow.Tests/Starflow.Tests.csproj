@@ -22,6 +22,7 @@
     <Compile Include="..\Starflow\WebhookText.cs" Link="Source\WebhookText.cs" />
     <Compile Include="..\Starflow\Vitals.cs" Link="Source\Vitals.cs" />
     <Compile Include="..\Starflow\OptionGuide.cs" Link="Source\OptionGuide.cs" />
+    <Compile Include="..\Starflow\SharedIndex.cs" Link="Source\SharedIndex.cs" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />

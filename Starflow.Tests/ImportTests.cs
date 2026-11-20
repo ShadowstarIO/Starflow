@@ -179,4 +179,26 @@ public class ImportTests
         using (var gz = new GZipStream(ms, CompressionLevel.SmallestSize, true)) gz.Write(raw, 0, raw.Length);
         return Convert.ToBase64String(ms.ToArray()).TrimEnd('=').Replace('+', '-').Replace('/', '_');
     }
+
+    [Fact]
+    public void StatusShiftCharacterChatAndStates()
+    {
+        const string json = """
+        { "Rules": [ { "Name": "C", "CharacterFilter": "Ada Moon@Beta",
+          "AndChips": [ { "Kind": 16, "Value": "Friend Name" }, { "Kind": 17, "Value": "Free Company|hello" }, { "Kind": 18, "Value": "" } ],
+          "States": [ { "Flag": 26, "Op": 1 }, { "Flag": 35, "Op": 1 } ] } ],
+          "NamedTemplates": [ { "Title": "t", "Body": "In {zone}" } ], "CommentTemplates": [ "Old one", "In {zone}" ] }
+        """;
+        Assert.True(Importers.TryStatusShift(json, out var flows, out var message), message);
+        var when = flows[0].In(Section.When);
+        var tell = when.Single(c => c.Type == CardType.Chat && c.Option == "tell");
+        Assert.Equal("Friend Name", tell.Extra);
+        var fc = when.Single(c => c.Type == CardType.Chat && c.Option == "fc");
+        Assert.Equal("hello", fc.Value);
+        Assert.Contains(when, c => c.Type == CardType.State && c.Value == "Accessory");
+        Assert.Contains(when, c => c.Type == CardType.State && c.Value == "Targeted");
+        Assert.Contains(when, c => c.Type == CardType.Character && c.Value == "Ada Moon@Beta");
+        Assert.DoesNotContain("character filter", message);
+        Assert.Equal(["In {zone}", "Old one"], Importers.StatusShiftTemplates(json));
+    }
 }

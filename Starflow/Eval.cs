@@ -17,7 +17,7 @@ public static class Eval
 
     public static bool SectionMatches(FlowItem flow, Section section, World world)
     {
-        var cards = flow.In(section);
+        var cards = flow.Active(section);
         if (cards.Count == 0) return false;
         var join = section == Section.Until ? flow.UntilJoin : flow.WhenJoin;
         if (join == Join.Any)
@@ -42,9 +42,10 @@ public static class Eval
         foreach (var section in new[] { Section.When, Section.Until })
         {
             var cards = flow.In(section);
-            if (cards.Count == 0)
+            if (flow.Active(section).Count == 0)
             {
-                yield return section == Section.When ? "When is empty, so this does not start on its own." : "Until is empty, so only When going false ends it.";
+                var empty = cards.Count == 0 ? "is empty" : "has only cards that are off";
+                yield return section == Section.When ? $"When {empty}, so this does not start on its own." : $"Until {empty}, so only When going false ends it.";
                 continue;
             }
 
@@ -57,8 +58,13 @@ public static class Eval
             yield return $"{(whole ? "yes" : "no")}  {section} ({need}) {means}";
             for (var i = 0; i < cards.Count; i++)
             {
+                if (cards[i].Off)
+                {
+                    yield return $"off  {Catalog.Key(section, i)}  {cards[i].Described} (switched off, not checked)";
+                    continue;
+                }
                 var on = CardMatches(cards[i], world);
-                yield return $"{(on ? "yes" : "no")}  {Catalog.Key(section, i)}  {cards[i].Label}";
+                yield return $"{(on ? "yes" : "no")}  {Catalog.Key(section, i)}  {cards[i].Described}";
             }
         }
     }
@@ -98,6 +104,7 @@ public static class Eval
             CardType.Hurt => Hurt(world, card, value),
             CardType.PartyDown => Match.Number(world.PartyDown, value.Length == 0 ? ">=1" : value),
             CardType.Chat => Chat(world, card, value),
+            CardType.Character => Character(world, value),
             _ => false,
         };
     }
@@ -113,6 +120,21 @@ public static class Eval
         {
             if (word.Equals(world.JobAbbr, StringComparison.OrdinalIgnoreCase)) return true;
             if (word.Equals(world.JobName, StringComparison.OrdinalIgnoreCase)) return true;
+        }
+        return false;
+    }
+
+    // First Last, or First Last@World for one home world. Several with a | b, or a /regex/ on First Last@World.
+    private static bool Character(World world, string value)
+    {
+        if (world.CharacterName.Length == 0) return false;
+        if (Match.IsRegex(value, out _)) return Match.AnyTerm(world.CharacterKey, value);
+        foreach (var word in Words(value))
+        {
+            var at = word.IndexOf('@');
+            var name = at < 0 ? word : word[..at].Trim();
+            if (!name.Equals(world.CharacterName, StringComparison.OrdinalIgnoreCase)) continue;
+            if (at < 0 || word[(at + 1)..].Trim().Equals(world.HomeWorldName, StringComparison.OrdinalIgnoreCase)) return true;
         }
         return false;
     }

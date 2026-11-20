@@ -22,6 +22,11 @@ public sealed partial class MainWindow
 
     private void DrawInspector(Configuration cfg)
     {
+        if (showShared)
+        {
+            DrawShared(cfg);
+            return;
+        }
         var flow = cfg.Flows.Find(f => f.Id == selectedId);
         if (showImport || flow is null)
         {
@@ -38,51 +43,90 @@ public sealed partial class MainWindow
             return;
         }
 
+        DrawCardDetails(flow, card);
+        ImGui.Spacing();
+        ImGui.Separator();
+        ImGui.Spacing();
+        DrawCardEditor(cfg, flow, card);
+    }
+
+    // Top half: what the card is, whether it is doing anything, and why the flow is on or off. Read only.
+    private void DrawCardDetails(FlowItem flow, Card card)
+    {
         var here = plugin.Engine.Last;
         var index = flow.In(card.Section).IndexOf(card);
         ImGui.TextDisabled($"{Catalog.Key(card.Section, Math.Max(0, index))} · {card.Section} · {Describe(card.Type)}");
-        ImGui.TextUnformatted(card.Label);
-        var error = plugin.Engine.Error(card.Id);
-        if (error is not null) Ui.Wrapped(Red, "Last run: " + error);
-        var gap = Catalog.Missing(card);
-        if (gap is not null) ImGui.TextColored(Amber, "Needs a " + gap);
+        if (card.Off) Ui.Wrapped(Ui.Grey, card.Title + "  (off, skipped)");
+        else ImGui.TextWrapped(card.Title);
+        if (!string.IsNullOrWhiteSpace(card.Note)) Ui.Wrapped(Ui.Grey, card.Label);
 
-        // What the game says right now, for every condition, so the fields below have something to compare against.
+        if (card.Off) ImGui.TextDisabled("Switched off. The flow runs as if this card were not there.");
+        else
+        {
+            var error = plugin.Engine.Error(card.Id);
+            if (error is not null) Ui.Wrapped(Red, "Last run: " + error);
+            var gap = Catalog.Missing(card);
+            if (gap is not null) ImGui.TextColored(Amber, "Needs a " + gap);
+
+            // What the game says right now, for every condition, so the fields below have something to compare against.
+            if (CardType.IsCondition(card.Type))
+            {
+                var live = here.LoggedIn && Eval.CardMatches(card, here);
+                Ui.Dot(live, live ? Green : Ui.Grey);
+                ImGui.SameLine();
+                ImGui.TextColored(live ? Green : Ui.Grey, live ? "True right now" : "False right now");
+            }
+        }
         if (CardType.IsCondition(card.Type))
         {
-            var live = here.LoggedIn && Eval.CardMatches(card, here);
-            Ui.Dot(live, live ? Green : Ui.Grey);
-            ImGui.SameLine();
-            ImGui.TextColored(live ? Green : Ui.Grey, live ? "True right now" : "False right now");
             var now = NowText(card, here);
             if (now.Length > 0) Ui.Wrapped(Teal, "Right now: " + now);
         }
-        ImGui.Separator();
 
+        if (CardType.IsSlotted(card.Type) && card.Section == Section.Do)
+            ImGui.TextDisabled(card.Keep || flow.OnStop == StopMode.Keep
+                ? "Left as it is when the flow stops."
+                : "Put back when the flow stops, after After runs.");
+        if (CardType.IsSlotted(card.Type) && card.Section == Section.After)
+            ImGui.TextDisabled("Written on the way out. Revert will not undo it.");
+
+        ImGui.Spacing();
+        if (ImGui.CollapsingHeader("Why this flow is, or is not, running", ImGuiTreeNodeFlags.DefaultOpen)) Why(flow, false);
+    }
+
+    // Bottom half: everything you can change on the card.
+    private void DrawCardEditor(Configuration cfg, FlowItem flow, Card card)
+    {
+        ImGui.TextUnformatted("Edit");
+        var cardOn = !card.Off;
+        if (ImGui.Checkbox("On##card", ref cardOn)) { card.Off = !cardOn; cfg.Save(); }
+        Ui.Tip("Untick to keep this card in the flow but skip it. Tick to use it again.");
         if (CardType.IsCondition(card.Type))
         {
+            ImGui.SameLine();
             var not = card.Not;
             if (ImGui.Checkbox("Not", ref not)) { card.Not = not; cfg.Save(); }
             Tip("Match when this is false.");
+        }
+        if (CardType.IsSlotted(card.Type) && card.Section == Section.Do)
+        {
+            ImGui.SameLine();
+            var keep = card.Keep;
+            if (ImGui.Checkbox("Keep this one", ref keep)) { card.Keep = keep; cfg.Save(); }
+            Tip("Leave this value as it is when the flow stops, instead of putting the old one back.");
+        }
+
+        var note = card.Note ?? string.Empty;
+        ImGui.SetNextItemWidth(-1);
+        if (ImGui.InputTextWithHint("##note", "Short description, shown on the card", ref note, Card.NoteMax))
+        {
+            card.Note = note;
+            cfg.Save();
         }
 
         ImGui.PushItemWidth(Ui.Wrap ? -Math.Min(110, ImGui.GetContentRegionAvail().X * 0.4f) : -110);
         Edit(cfg, flow, card);
         ImGui.PopItemWidth();
-
-        if (CardType.IsSlotted(card.Type) && card.Section == Section.Do)
-        {
-            var keep = card.Keep;
-            if (ImGui.Checkbox("Keep this one", ref keep)) { card.Keep = keep; cfg.Save(); }
-            ImGui.TextDisabled(keep || flow.OnStop == StopMode.Keep
-                ? "Left as it is when the flow stops."
-                : "Put back when the flow stops, after After runs.");
-        }
-        if (CardType.IsSlotted(card.Type) && card.Section == Section.After)
-            ImGui.TextDisabled("Written on the way out. Revert will not undo it.");
-
-        ImGui.Separator();
-        Why(flow);
     }
 
     private static string Describe(string type)
@@ -91,9 +135,9 @@ public sealed partial class MainWindow
         return Catalog.For(Section.When).Concat(Catalog.For(Section.Do)).FirstOrDefault(d => d.Type == type)?.Label ?? type;
     }
 
-    private void Why(FlowItem flow)
+    private void Why(FlowItem flow, bool title = true)
     {
-        ImGui.TextColored(Teal, "Why this flow is, or is not, running");
+        if (title) ImGui.TextColored(Teal, "Why this flow is, or is not, running");
         foreach (var line in plugin.Engine.Why(flow))
         {
             if (line.StartsWith("Why:", StringComparison.Ordinal)) ImGui.TextWrapped(line[4..].Trim());
@@ -116,6 +160,7 @@ public sealed partial class MainWindow
             CardType.Region => w.RegionName,
             CardType.World => w.Account == "visiting" ? $"{w.WorldName} (home {w.HomeWorldName})" : w.WorldName,
             CardType.DataCenter => w.DataCenterName,
+            CardType.Character => w.CharacterKey,
             CardType.Account => w.Account == "visiting" ? $"visiting {w.WorldName}, home {w.HomeWorldName}" : $"home, {w.WorldName}",
             CardType.Housing => w.Housing.Line(),
             CardType.Group or CardType.Party => $"{w.PartySize} in party ({w.Group})" + (w.Companions > 0 ? $", plus {w.Companions} companion or pet" : string.Empty),
@@ -181,6 +226,17 @@ public sealed partial class MainWindow
             case CardType.Region: MatchText(cfg, "Region", v => card.Value = v, card.Value, "La Noscea | /regex/"); Fill(cfg, card, here.RegionName); break;
             case CardType.World: MatchText(cfg, "World", v => card.Value = v, card.Value, "World name"); Fill(cfg, card, here.WorldName); break;
             case CardType.DataCenter: MatchText(cfg, "Data center", v => card.Value = v, card.Value, "Name"); Fill(cfg, card, here.DataCenterName); break;
+            case CardType.Character:
+                MatchText(cfg, "Character", v => card.Value = v, card.Value, "First Last | First Last@World");
+                if (here.CharacterKey.Length > 0) Fill(cfg, card, here.CharacterKey);
+                if (cfg.Characters.Count > 0)
+                {
+                    Ui.Next(Ui.ButtonWidth("Seen..."));
+                    Pick(cfg, "Seen", cfg.Characters, v => card.Value = v);
+                }
+                ImGui.TextDisabled("@World is the home world. Leave it off to match the name on any world.");
+                ImGui.TextDisabled("For a flow that belongs to one character, Duplicate it and keep the copies in a folder per character.");
+                break;
             case CardType.Plugin:
                 Text(cfg, "Plugin", v => card.Value = v, card.Value, "InternalName");
                 Pick(cfg, "Installed", Bridges.PluginNames().OrderBy(n => n, StringComparer.OrdinalIgnoreCase).ToList(), v => card.Value = v);
@@ -227,6 +283,16 @@ public sealed partial class MainWindow
 
             case CardType.Command: EditCommand(cfg, flow, card, here); break;
             case CardType.Wait: Int(cfg, "Milliseconds", card.WaitMs, v => card.WaitMs = Math.Max(0, v)); break;
+            case CardType.Sound:
+            {
+                var effect = Math.Clamp(card.Number, 1, 16);
+                if (ImGui.SliderInt("Sound", ref effect, 1, 16, "<se.%d>")) { card.Number = effect; cfg.Save(); }
+                ImGui.SameLine();
+                if (ImGui.SmallButton("Play")) Alerts.Sound(effect);
+                ImGui.TextDisabled("Plays only for you.");
+                ImGui.TextDisabled($"For others to hear it, use a Command card that sends <se.{effect}> in party or a linkshell.");
+                break;
+            }
             case CardType.Notice:
                 Text(cfg, "Text", v => card.Value = v, card.Value, "Entered {zone}");
                 ImGui.TextDisabled("Only you see it, in your chat log.");
@@ -234,6 +300,12 @@ public sealed partial class MainWindow
                 break;
             case CardType.SearchComment:
                 Text(cfg, "Comment", v => card.Value = v, card.Value, "In {zone} on {world}");
+                if (cfg.CommentTemplates.Count > 0) Pick(cfg, "Templates", cfg.CommentTemplates, v => card.Value = v);
+                if (!string.IsNullOrWhiteSpace(card.Value) && !cfg.CommentTemplates.Contains(card.Value.Trim()))
+                {
+                    if (cfg.CommentTemplates.Count > 0) ImGui.SameLine();
+                    if (ImGui.SmallButton("Save as template")) { cfg.CommentTemplates.Add(card.Value.Trim()); cfg.Save(); }
+                }
                 TokenHint(card.Value, here);
                 var filled = Tokens.Fill(card.Value, here);
                 if (filled.Length > ChatSender.CommentMax) ImGui.TextColored(Amber, $"Cut to {ChatSender.CommentMax} characters.");
@@ -255,7 +327,7 @@ public sealed partial class MainWindow
                 var keep = card.Permanent;
                 if (ImGui.Checkbox("Remember", ref keep)) { card.Permanent = keep; cfg.Save(); }
                 ImGui.TextDisabled(keep ? "Saved in the plugin's collection." : "Temporary. Resets when the game restarts.");
-                ImGui.TextWrapped("Dalamud refuses a plugin that sits in more than one collection. Toggle the collection instead.");
+                ImGui.TextWrapped("Dalamud may refuse a plugin that sits in more than one collection. Toggle the collection instead.");
                 break;
             case CardType.Setting: EditSetting(cfg, card); break;
             case CardType.Glamour:

@@ -35,6 +35,8 @@ public static class Tokens
         new("target", "Target name", w => w.TargetName),
         new("targetjob", "Target's job, if a character", w => w.TargetJob),
         new("mount", "Mount name while mounted", w => w.Mount),
+        new("accessory", "Fashion accessory you have out", w => w.Accessory),
+        new("targeter", "Nearest player targeting you", w => w.Targeters.Count > 0 ? w.Targeters[0] : string.Empty),
         new("status", "Your online status", w => w.OnlineStatus),
         new("weather", "Weather now", w => w.Weather),
         new("lastweather", "Weather in the window before", w => w.WeatherBefore),

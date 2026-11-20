@@ -45,7 +45,7 @@ internal sealed class Engine
         if (delta > TimeSpan.Zero) Clock += delta;
     }
 
-    // Logout or character select. The queue is dropped on purpose: a half-fired macro does not resume.
+    // Logout, character select, or plugin unload. The queue is dropped on purpose: a half-fired macro does not resume.
     public void Reset()
     {
         if (active.Count == 0 && runs.Count == 0 && slots.Count == 0 && pending.Count == 0 && confirms.Count == 0)
@@ -62,11 +62,11 @@ internal sealed class Engine
             // Game settings and Penumbra are local and can be put back here. Status and glamour need a character.
             if (!key.StartsWith("setting:", StringComparison.Ordinal) && !key.StartsWith("penumbra:", StringComparison.Ordinal)) continue;
             if (!Actions.Restore(key, slot.Original, out var error))
-                Plugin.Log.Warning("Restore of {Key} on logout failed: {Error}", key, error);
+                Plugin.Log.Warning("Restore of {Key} on logout or unload failed: {Error}", key, error);
         }
 
         if (dropped > 0 || active.Count > 0)
-            Plugin.Log.Information("Logged out. {Count} queued cards dropped; they will not resume.", dropped);
+            Plugin.Log.Information("Logged out or unloaded. {Count} queued cards dropped; they will not resume.", dropped);
 
         active.Clear();
         held.Clear();
@@ -119,7 +119,7 @@ internal sealed class Engine
                 continue;
             }
 
-            var when = flow.In(Section.When).Count > 0 && Eval.SectionMatches(flow, Section.When, Last);
+            var when = flow.Active(Section.When).Count > 0 && Eval.SectionMatches(flow, Section.When, Last);
             if (!when)
             {
                 trueSince.Remove(flow.Id);
@@ -145,7 +145,7 @@ internal sealed class Engine
 
             if (active.Contains(flow.Id))
             {
-                if (flow.In(Section.Until).Count > 0 && Eval.SectionMatches(flow, Section.Until, Last))
+                if (flow.Active(Section.Until).Count > 0 && Eval.SectionMatches(flow, Section.Until, Last))
                 {
                     // Until is a rising end. The flow stays off until When itself goes false.
                     held.Add(flow.Id);
@@ -217,7 +217,7 @@ internal sealed class Engine
         if (manual && Last.LoggedIn) held.Add(flow.Id);
         runs.RemoveAll(r => r.FlowId == flow.Id && r.Phase == Section.Do);
         confirms.RemoveAll(c => c.FlowId == flow.Id && c.Card.Section == Section.Do);
-        if (flow.In(Section.After).Count == 0) Release(flow);
+        if (flow.Active(Section.After).Count == 0) Release(flow);
         else Enqueue(flow, Section.After, true, true, false);
         if (!quiet && config.NotifyInChat) Plugin.Notify(was ? $"Stopped {flow.Name}" : $"Ran After for {flow.Name}");
     }
@@ -241,7 +241,7 @@ internal sealed class Engine
         if (flow.Mode == RunMode.Off) return "mode is Off, so it only runs from Run once.";
         if (active.Contains(flow.Id)) return "it is on. When matched, and Until has not tripped.";
         if (Quiet(world) && !flow.IgnoreQuiet) return "a quiet option in Settings is holding it right now.";
-        if (flow.In(Section.When).Count == 0) return "When is empty, so it does not start on its own.";
+        if (flow.Active(Section.When).Count == 0) return flow.In(Section.When).Count == 0 ? "When is empty, so it does not start on its own." : "Every When card is off, so it does not start on its own.";
         if (!Eval.SectionMatches(flow, Section.When, world))
             return flow.WhenJoin == Join.All ? "When is false. Every When card must be true; the 'no' lines below are the ones stopping it." : "When is false. At least one When card must be true, and none are.";
         if (held.Contains(flow.Id)) return "it was stopped (by Until, Stop, or a skipped prompt) and waits for When to go false once before it can start again.";
@@ -258,7 +258,7 @@ internal sealed class Engine
         foreach (var line in DryStage(flow, Section.Do)) yield return "  " + line;
         yield return "Stage 2 · On stop (After)";
         foreach (var line in DryStage(flow, Section.After)) yield return "  " + line;
-        var slotted = flow.In(Section.Do).Where(c => CardType.IsSlotted(c.Type) && !c.Keep).ToList();
+        var slotted = flow.Active(Section.Do).Where(c => CardType.IsSlotted(c.Type) && !c.Keep).ToList();
         yield return "Stage 3 · Revert";
         if (flow.OnStop == StopMode.Keep) yield return "  Stop is Keep. Nothing is put back.";
         else if (slotted.Count == 0) yield return "  No slotted cards in Do. Nothing to put back.";
@@ -274,6 +274,11 @@ internal sealed class Engine
         foreach (var card in flow.In(section))
         {
             var key = Catalog.Key(section, i++);
+            if (card.Off)
+            {
+                yield return $"{Stamp(at)}  {key}  off, skipped: {card.Described}";
+                continue;
+            }
             if (card.Type == CardType.Wait)
             {
                 at += Math.Max(0, card.WaitMs);
@@ -287,7 +292,7 @@ internal sealed class Engine
             {
                 CardType.Command or CardType.Notice => Tokens.Fill(card.Value, world),
                 CardType.SearchComment => ChatSender.Comment(Tokens.Fill(card.Value, world)),
-                _ => card.Label,
+                _ => card.Described,
             };
             var repeat = times > 1 ? $"  ×{times}, {gap} ms apart" : string.Empty;
             var slot = section != Section.Do || !CardType.IsSlotted(card.Type) ? string.Empty
@@ -335,7 +340,7 @@ internal sealed class Engine
     private void Enqueue(FlowItem flow, Section section, bool releaseAfter, bool slot, bool oneShot)
     {
         runs.RemoveAll(r => r.FlowId == flow.Id && r.Phase == section);
-        var cards = flow.In(section);
+        var cards = flow.Active(section);
         foreach (var card in cards) errors.Remove(card.Id);
 
         var run = new Run { FlowId = flow.Id, Phase = section, ReleaseAfter = releaseAfter, Slot = slot, OneShot = oneShot };
@@ -506,7 +511,7 @@ internal sealed class Engine
         {
             if (flow.Id == leaving.Id || !active.Contains(flow.Id)) continue;
             Card? found = null;
-            foreach (var candidate in flow.In(Section.Do))
+            foreach (var candidate in flow.Active(Section.Do))
             {
                 if (SlotKey(candidate) == key) found = candidate;
             }
@@ -532,6 +537,9 @@ internal sealed class Engine
         if (config.QuietWhenOccupied && world.Has("Occupied")) return true;
         if (config.QuietWhenDead && world.Has("Dead")) return true;
         if (config.QuietInDuty && world.Has("InDuty")) return true;
+        if (config.QuietWhenTargeting && world.Has("HasTarget")) return true;
+        if (config.QuietWhenTargeted && world.Has("Targeted")) return true;
+        if (config.QuietWhenEmoting && world.Has("Emoting")) return true;
         return false;
     }
 

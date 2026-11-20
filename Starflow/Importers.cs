@@ -337,8 +337,52 @@ public static class Importers
             if (back.Length > 0) flow.Cards.Add(new Card { Section = Section.After, Type = CardType.Command, Value = back, WaitMs = 0 });
         }
 
-        if (Str(rule, "CharacterFilter").Trim().Length > 0) skipped.Add("character filter");
+        var character = Str(rule, "CharacterFilter").Trim();
+        if (character.Length > 0) AddChip(flow, new Card { Section = Section.When, Type = CardType.Character, Value = character }, false);
         return flow;
+    }
+
+    // StatusShift's channel names, as Starflow's Chat card spells them. Blank is any channel.
+    private static string StatusShiftChannel(string name)
+    {
+        var text = (name ?? string.Empty).Trim().ToLowerInvariant();
+        if (text.Length == 0) return "any";
+        if (text.StartsWith("cross world linkshell", StringComparison.Ordinal)) return "cwls";
+        if (text.StartsWith("linkshell", StringComparison.Ordinal)) return "ls";
+        return text switch
+        {
+            "free company" => "fc",
+            "novice network" => "novice",
+            "pvp team" => "pvpteam",
+            "tell out" => "tell",
+            _ => text,
+        };
+    }
+
+    // Search comment templates from a whole StatusShift config. Empty for a single rule or a code.
+    public static List<string> StatusShiftTemplates(string text)
+    {
+        var list = new List<string>();
+        try
+        {
+            using var doc = JsonDocument.Parse((text ?? string.Empty).Trim());
+            var root = doc.RootElement;
+            if (root.ValueKind != JsonValueKind.Object) return list;
+            foreach (var t in Array(root, "NamedTemplates"))
+            {
+                var body = Str(t, "Body").Trim();
+                if (body.Length > 0) list.Add(body);
+            }
+            foreach (var t in Array(root, "CommentTemplates"))
+            {
+                var body = t.ValueKind == JsonValueKind.String ? (t.GetString() ?? string.Empty).Trim() : string.Empty;
+                if (body.Length > 0) list.Add(body);
+            }
+        }
+        catch (JsonException)
+        {
+        }
+        return list.Distinct().ToList();
     }
 
     private static string? StatusShiftSchedule(JsonElement rule)
@@ -399,6 +443,18 @@ public static class Importers
             case "DataCenter": return C(CardType.DataCenter, value);
             case "Status": return C(CardType.Status, value);
             case "Role": return C(CardType.Role, value);
+            case "Accessory":
+                if (value.Length > 0) skipped.Add("accessory name " + value);
+                return C(CardType.State, "Accessory");
+            case "TellFrom":
+                return new Card { Section = Section.When, Type = CardType.Chat, Option = "tell", Extra = value, Number = 30 };
+            case "Chat":
+            {
+                var bar = value.IndexOf('|');
+                var channel = StatusShiftChannel(bar < 0 ? value : value[..bar]);
+                var text = bar < 0 ? string.Empty : value[(bar + 1)..].Trim();
+                return new Card { Section = Section.When, Type = CardType.Chat, Option = channel, Value = text, Number = 20 };
+            }
             default:
                 skipped.Add("chip " + kind);
                 return null;
@@ -425,6 +481,8 @@ public static class Importers
             case "InSanctuary": return P("Sanctuary");
             case "TargetingPlayer": return new Card { Section = Section.When, Type = CardType.Target, Value = "player" };
             case "TargetingEnemy": return new Card { Section = Section.When, Type = CardType.Target, Value = "npc" };
+            case "TargetedByPlayer": return S("Targeted");
+            case "FashionAccessory": return S("Accessory");
             default:
                 skipped.Add("state " + flag);
                 return null;

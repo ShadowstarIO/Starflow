@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Dalamud.Game.Command;
 using Dalamud.Interface.Windowing;
@@ -24,6 +25,7 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] internal static IPluginLog Log { get; private set; } = null!;
     [PluginService] internal static IGameConfig GameConfig { get; private set; } = null!;
     [PluginService] internal static IBuddyList BuddyList { get; private set; } = null!;
+    [PluginService] internal static IToastGui Toast { get; private set; } = null!;
 
     public static readonly string AppVersion = typeof(Plugin).Assembly.GetName().Version?.ToString() ?? "0.0.1.0";
     private const string CommandName = "/starflow";
@@ -80,6 +82,10 @@ public sealed class Plugin : IDalamudPlugin
 
     public void Dispose()
     {
+        // Unloading (disable, update, reload) puts back the game settings and Penumbra changes that running
+        // flows made, the same as logging out. A half-sent queue is dropped, not finished.
+        try { Framework.RunOnFrameworkThread(() => Engine.Reset()).Wait(TimeSpan.FromSeconds(2)); }
+        catch (Exception ex) { Log.Warning(ex, "Could not put settings back on unload"); }
         Framework.Update -= OnFramework;
         ClientState.TerritoryChanged -= OnTerritory;
         ClientState.Logout -= OnLogout;
@@ -129,15 +135,76 @@ public sealed class Plugin : IDalamudPlugin
             return;
         }
 
+        RememberCharacter();
         if (paused) return;
         Engine.Tick(false);
         // Open only for a new ask. An ask that survives a zone line does not reopen the window.
         if (Engine.AskSerial != askSeen)
         {
             askSeen = Engine.AskSerial;
-            if (Engine.Waiting > 0) askWindow.IsOpen = true;
+            if (Engine.Waiting > 0)
+            {
+                askWindow.IsOpen = true;
+                Alerts.Prompt(Configuration, Engine.Waiting);
+            }
         }
     }
+
+    // Runs before each check. Keeps the list of characters seen for the Character card's picker, and,
+    // with "Remember on/off per character", switches flows to how they were left on this character.
+    private void RememberCharacter()
+    {
+        var player = ObjectTable.LocalPlayer;
+        var name = player?.Name.TextValue ?? string.Empty;
+        if (name.Length == 0) return;
+        var home = player?.HomeWorld.ValueNullable?.Name.ToString() ?? string.Empty;
+        var key = home.Length == 0 ? name : name + "@" + home;
+        var cfg = Configuration;
+
+        if (key != lastCharacter)
+        {
+            lastCharacter = key;
+            if (!cfg.Characters.Exists(c => c.Equals(key, StringComparison.OrdinalIgnoreCase)))
+            {
+                cfg.Characters.Add(key);
+                cfg.Characters.Sort(StringComparer.OrdinalIgnoreCase);
+                cfg.Save();
+            }
+            if (cfg.PerCharacterOnOff && cfg.CharacterOnOff.TryGetValue(key, out var saved))
+            {
+                var switched = 0;
+                foreach (var flow in cfg.Flows)
+                {
+                    if (!saved.TryGetValue(flow.Id, out var on) || flow.Enabled == on) continue;
+                    flow.Enabled = on;
+                    switched++;
+                }
+                if (switched > 0)
+                {
+                    cfg.Save();
+                    Notify($"Switched {switched} flow{(switched == 1 ? string.Empty : "s")} to how you left {(switched == 1 ? "it" : "them")} on {name}.");
+                }
+            }
+        }
+
+        if (!cfg.PerCharacterOnOff) return;
+        // Record this character's on/off as it changes. The first time a character is seen, its flows keep their current state.
+        if (!cfg.CharacterOnOff.TryGetValue(key, out var map))
+        {
+            map = new Dictionary<string, bool>(StringComparer.Ordinal);
+            cfg.CharacterOnOff[key] = map;
+        }
+        var changed = false;
+        foreach (var flow in cfg.Flows)
+        {
+            if (map.TryGetValue(flow.Id, out var on) && on == flow.Enabled) continue;
+            map[flow.Id] = flow.Enabled;
+            changed = true;
+        }
+        if (changed) cfg.Save();
+    }
+
+    private string lastCharacter = string.Empty;
 
     private void OnTerritory(uint _)
     {
@@ -159,10 +226,19 @@ public sealed class Plugin : IDalamudPlugin
                 Notify("/fl stop Name — After, then revert");
                 Notify("/fl why Name — conditions");
                 Notify("/fl dry Name — Do list");
-                Notify("/fl now | pause | resume | prompts | config");
+                Notify("/fl now | zone | pause | resume | prompts | config");
                 helpWindow.IsOpen = true;
                 break;
             case "config": ToggleConfig(); break;
+            case "zone" or "where":
+            {
+                Engine.Tick(true);
+                var w = Engine.Last;
+                Notify(w.Line());
+                if (w.CharacterKey.Length > 0) Notify("Character: " + w.CharacterKey);
+                if (w.Housing.InWard) Notify("Housing: " + w.Housing.Line());
+                break;
+            }
             case "ask" or "prompts" or "prompt": OpenAsk(); break;
             case "now":
                 Engine.Tick(true);

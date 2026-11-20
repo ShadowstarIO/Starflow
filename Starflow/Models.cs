@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
 
 namespace Starflow;
 
@@ -62,6 +63,7 @@ public static class CardType
     public const string Hurt = "hurt";
     public const string PartyDown = "party-down";
     public const string Chat = "chat";
+    public const string Character = "character";
 
     public const string Command = "command";
     public const string Wait = "wait";
@@ -80,11 +82,12 @@ public static class CardType
     public const string CloseGame = "close-game";
     public const string Webhook = "webhook";
     public const string Lifestream = "lifestream";
+    public const string Sound = "sound";
 
     public static bool IsCondition(string type) => type is
         State or Job or Role or Zone or Region or World or DataCenter or Account or Place or Housing or Duty
         or Party or Group or Nearby or NearbyName or Level or Time or Weekday or Schedule or Weather or Mount
-        or Status or Target or Plugin or Vitals or Effect or Enmity or Hurt or PartyDown or Chat;
+        or Status or Target or Plugin or Vitals or Effect or Enmity or Hurt or PartyDown or Chat or Character;
 
     // Cards that read moment-to-moment play or other people. Their flows cannot send combat actions.
     public static bool IsReactive(string type) => type is Vitals or Effect or Enmity or Hurt or PartyDown or Chat;
@@ -110,8 +113,20 @@ public sealed class Card
     public bool Permanent { get; set; }
     public bool Inherit { get; set; }
     public bool Keep { get; set; }
+    // Switched off: kept in the flow but skipped when it runs and when its conditions are checked.
+    public bool Off { get; set; }
+    // A short description you write. The card shows it in place of its label.
+    public string Note { get; set; } = string.Empty;
 
-    public string Label => Catalog.Label(this);
+    public const int NoteMax = 60;
+
+    // What the card shows: your note if there is one, else the label.
+    [JsonIgnore] public string Title => string.IsNullOrWhiteSpace(Note) ? Label : Note.Trim();
+
+    // The label with your note after it, for /fl why and /fl dry.
+    [JsonIgnore] public string Described => string.IsNullOrWhiteSpace(Note) ? Label : $"{Label} ({Note.Trim()})";
+
+    [JsonIgnore] public string Label => Catalog.Label(this);
 }
 
 [Serializable]
@@ -131,8 +146,11 @@ public sealed class FlowItem
     public bool IgnoreQuiet { get; set; }
     public List<Card> Cards { get; set; } = [];
 
-    public string FolderKey => Folders.Clean(Folder);
-    public string Token => (Name ?? string.Empty).Trim();
+    [JsonIgnore] public string FolderKey => Folders.Clean(Folder);
+    [JsonIgnore] public string Token => (Name ?? string.Empty).Trim();
+
+    // The cards in a section that are switched on. Running and checking use these.
+    public List<Card> Active(Section section) => In(section).FindAll(c => !c.Off);
 
     public List<Card> In(Section section)
     {

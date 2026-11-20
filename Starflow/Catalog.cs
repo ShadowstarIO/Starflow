@@ -13,7 +13,7 @@ public static class Catalog
         "Swimming", "Diving", "Crafting", "Gathering", "Dead", "Occupied", "BetweenAreas",
         "Casting", "Fishing", "PvP", "Housing", "WeaponDrawn", "InParty", "HasTarget",
         "Emoting", "Performing", "Trade", "RolePlaying", "Sitting", "Talking", "DeepDungeon",
-        "Town", "Overworld", "Inn", "GoldSaucer",
+        "Town", "Overworld", "Inn", "GoldSaucer", "Accessory", "Targeted",
     ]);
 
     public static readonly string[] Places = Alpha(
@@ -59,6 +59,7 @@ public static class Catalog
                 new(CardType.Role, "Role", "One or more roles"),
                 new(CardType.Level, "Level", "Compare the level"),
                 new(CardType.World, "World", "Current or home world"),
+                new(CardType.Character, "Character", "The character you're logged in as"),
                 new(CardType.Account, "Home or visiting", "Home world versus current world"),
                 new(CardType.DataCenter, "Data center", "Data center name"),
                 new(CardType.Schedule, "Schedule", "Always, daily, weekly, one date. Local time"),
@@ -85,6 +86,7 @@ public static class Catalog
             new(CardType.Command, "Command or macro", "Repeats up to 30 times"),
             new(CardType.Wait, "Wait", "Delay before the next card"),
             new(CardType.Notice, "Chat notice", "Text in your chat log"),
+            new(CardType.Sound, "Sound", "A chat sound effect only you hear"),
             new(CardType.Setting, "Game setting", "A system or UI option"),
             new(CardType.Online, "Online status", "Away, busy, role-playing"),
             new(CardType.SearchComment, "Search comment", "Your search info comment"),
@@ -131,6 +133,7 @@ public static class Catalog
             case CardType.Status: card.Value = "Busy"; break;
             case CardType.Command: card.Repeat = 1; card.WaitMs = 400; break;
             case CardType.Wait: card.WaitMs = 500; break;
+            case CardType.Sound: card.Number = 1; break;
             case CardType.Webhook: card.Option = "application/json"; card.Extra = WebhookText.DiscordTemplate; break;
             case CardType.Vitals: card.Option = "hp"; card.Extra = "me"; card.Value = "<50%"; break;
             case CardType.Effect: card.Extra = "me"; break;
@@ -170,6 +173,7 @@ public static class Catalog
             CardType.SearchComment when Blank(card.Value) => "comment",
             CardType.Webhook when !WebhookText.ValidUrl(card.Value, out _) => "webhook URL",
             CardType.Lifestream when Blank(card.Value) => "destination",
+            CardType.Sound when card.Number is < 1 or > 16 => "sound from 1 to 16",
             CardType.Chat when Blank(card.Option) => "channel",
             CardType.Setting when Blank(card.Value) => "option",
             CardType.Setting when OptionGuide.Blocked(card.Value) => "option Starflow is allowed to write",
@@ -190,6 +194,7 @@ public static class Catalog
             var cards = flow.In(section);
             for (var i = 0; i < cards.Count; i++)
             {
+                if (cards[i].Off) continue;
                 var gap = Missing(cards[i]);
                 if (gap is not null) list.Add($"{Key(section, i)} needs a {gap}");
                 if (reactive && cards[i].Type == CardType.Command && IsCombatCommand(cards[i].Value))
@@ -210,6 +215,7 @@ public static class Catalog
             CardType.Zone => $"{not}zone {Blank(card.Value, "name")}",
             CardType.Region => $"{not}region {Blank(card.Value, "name")}",
             CardType.World => $"{not}world {Blank(card.Value, "name")}",
+            CardType.Character => $"{not}character {Blank(card.Value, "name")}",
             CardType.DataCenter => $"{not}dc {Blank(card.Value, "name")}",
             CardType.Account => $"{not}{Blank(card.Value, "home")} world",
             CardType.Place => $"{not}place {Blank(card.Value, "place")}",
@@ -236,6 +242,7 @@ public static class Catalog
             CardType.Chat => $"{not}chat {Blank(card.Option, "any")}" + (Blank(card.Extra) ? string.Empty : $" from {card.Extra.Trim()}") + (Blank(card.Value) ? string.Empty : $" \"{card.Value.Trim()}\""),
             CardType.Command => CommandLabel(card),
             CardType.Wait => card.WaitMs <= 0 ? "Wait" : $"Wait {card.WaitMs} ms",
+            CardType.Sound => $"Sound <se.{card.Number}>",
             CardType.Notice => string.IsNullOrWhiteSpace(card.Value) ? "Chat notice" : $"Say {card.Value}",
             CardType.Setting => $"{Blank(card.Value, "option")} = {Blank(card.Extra, "?")}",
             CardType.Online => $"Status {Blank(card.Value, "online")}",
@@ -401,5 +408,5 @@ public static class Catalog
     }
 
     public static bool IsReactive(FlowItem flow) =>
-        flow.Cards.Exists(c => c.Section is Section.When or Section.Until && CardType.IsReactive(c.Type));
+        flow.Cards.Exists(c => !c.Off && c.Section is Section.When or Section.Until && CardType.IsReactive(c.Type));
 }

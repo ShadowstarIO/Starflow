@@ -41,18 +41,22 @@ public sealed partial class World
 
         var nearby = 0;
         var names = new List<string>();
+        var targeters = new List<(string Name, float Far)>();
         if (player is not null)
         {
             foreach (var obj in Plugin.ObjectTable)
             {
                 if (obj.ObjectKind != ObjectKind.Pc || obj.EntityId == player.EntityId) continue;
-                var d = obj.Position - player.Position;
-                if (d.LengthSquared() > 30f * 30f) continue;
-                nearby++;
                 var name = obj.Name.TextValue;
+                var far = (obj.Position - player.Position).LengthSquared();
+                if (obj.TargetObjectId == player.GameObjectId && name.Length > 0) targeters.Add((name, far));
+                if (far > 30f * 30f) continue;
+                nearby++;
                 if (name.Length > 0) names.Add(name);
             }
+            targeters.Sort((a, b) => a.Far.CompareTo(b.Far));
         }
+        var accessory = ReadAccessory(player?.Address ?? IntPtr.Zero);
 
         var places = PlacesOf(intended);
         var states = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -83,6 +87,8 @@ public sealed partial class World
         Add("InParty", party > 1);
         Add("HasTarget", Plugin.TargetManager.Target is not null);
         Add("Emoting", Flag(ConditionFlag.Emoting));
+        Add("Accessory", accessory.Length > 0);
+        Add("Targeted", targeters.Count > 0);
         Add("Performing", Flag(ConditionFlag.Performing));
         Add("Trade", Flag(ConditionFlag.TradeOpen));
         Add("RolePlaying", Flag(ConditionFlag.RolePlaying));
@@ -129,6 +135,8 @@ public sealed partial class World
             WeatherNext = next,
             WeatherNextMinutes = nextMinutes,
             Mount = ReadMount(player?.Address ?? IntPtr.Zero),
+            Accessory = accessory,
+            Targeters = targeters.ConvertAll(t => t.Name),
             Housing = HousingReader.Read(territoryId),
             OnlineStatus = player?.OnlineStatus.ValueNullable?.Name.ToString() ?? string.Empty,
             Target = TargetOf(),
@@ -242,6 +250,29 @@ public sealed partial class World
         catch (Exception ex)
         {
             Plugin.Log.Verbose(ex, "Mount read failed");
+            return string.Empty;
+        }
+    }
+
+    // Parasols and the other fashion accessories.
+    private static string ReadAccessory(IntPtr address)
+    {
+        if (address == IntPtr.Zero) return string.Empty;
+        try
+        {
+            unsafe
+            {
+                var character = (GameCharacter*)address;
+                uint id = character->OrnamentData.OrnamentId;
+                if (id == 0) return string.Empty;
+                var row = Plugin.DataManager.GetExcelSheet<Ornament>().GetRowOrDefault(id);
+                var name = row?.Singular.ToString() ?? string.Empty;
+                return name.Length > 0 ? Title(name) : id.ToString();
+            }
+        }
+        catch (Exception ex)
+        {
+            Plugin.Log.Verbose(ex, "Accessory read failed");
             return string.Empty;
         }
     }

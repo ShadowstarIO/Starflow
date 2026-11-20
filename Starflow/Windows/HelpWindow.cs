@@ -170,6 +170,7 @@ public sealed class HelpWindow : Window
             Code("/fl why Name", "why it is on or off");
             Code("/fl dry Name", "every stage, without sending");
             Code("/fl now", "which flows are on");
+            Code("/fl zone", "where you are: place, job, world, housing, weather");
             Code("/fl pause [seconds]", "pause, or pause for a while");
             Code("/fl resume", "resume");
             Code("/fl prompts", "open Prompts");

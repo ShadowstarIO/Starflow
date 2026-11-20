@@ -17,6 +17,7 @@ internal static class Actions
                 CardType.Command => Tokens.HeadIsToken(card.Value) ? new ActResult(false, "The command word has to be typed, not a token.") : Cmd(Tokens.Fill(card.Value, world)),
                 CardType.Wait => new ActResult(true, "Wait"),
                 CardType.Notice => Note(Tokens.Fill(card.Value, world)),
+                CardType.Sound => PlaySound(card),
                 CardType.SearchComment => Cmd(ChatSender.Comment(Tokens.Fill(card.Value, world))),
                 CardType.Setting => SetOption(card),
                 CardType.Online => SetStatus(card, world),
@@ -88,6 +89,13 @@ internal static class Actions
     {
         var ok = ChatSender.TrySend(command, out var error);
         return new ActResult(ok, ok ? command : error);
+    }
+
+    private static ActResult PlaySound(Card card)
+    {
+        if (card.Number is < 1 or > 16) return new ActResult(false, "Pick a sound from 1 to 16.");
+        Alerts.Sound(card.Number);
+        return new ActResult(true, $"<se.{card.Number}>");
     }
 
     private static ActResult Note(string text)

@@ -17,6 +17,20 @@ public sealed class Configuration : IPluginConfiguration
     public bool QuietBetweenAreas { get; set; } = true;
     public bool QuietWhenOccupied { get; set; } = true;
     public bool QuietWhenDead { get; set; } = true;
+    public bool QuietWhenTargeting { get; set; }
+    public bool QuietWhenTargeted { get; set; }
+    public bool QuietWhenEmoting { get; set; }
+    // When a flow waits for a yes: a toast, and a chat sound effect (1-16, 0 for none).
+    public bool PromptToast { get; set; } = true;
+    public int PromptSound { get; set; }
+    // Saved search comments to pick from on the Search comment card.
+    public List<string> CommentTemplates { get; set; } = [];
+    // Characters seen logged in, as First Last@HomeWorld, for the Character card's picker.
+    public List<string> Characters { get; set; } = [];
+    // Remember which flows are on for each character, and switch them when you change characters.
+    public bool PerCharacterOnOff { get; set; }
+    // Character key (First Last@HomeWorld) to flow id to on.
+    public Dictionary<string, Dictionary<string, bool>> CharacterOnOff { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     public float PollSec { get; set; } = 0.4f;
     // 0 sorts the list by priority, then name. 1 sorts by name.
     public int ListSort { get; set; }

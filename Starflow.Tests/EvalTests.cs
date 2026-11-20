@@ -202,4 +202,28 @@ public class ModOptionsTests
         Assert.Equal(["Large"], merged["Size"]);
         Assert.Equal(ModOptions.Format(map), ModOptions.Format(ModOptions.Parse(ModOptions.Format(map))));
     }
+
+    [Theory]
+    [InlineData("Ada Moon", true)]
+    [InlineData("ada moon", true)]
+    [InlineData("Ada Moon@Beta", true)]
+    [InlineData("Ada Moon@Alpha", false)]
+    [InlineData("Other Name | Ada Moon", true)]
+    [InlineData("Ada", false)]
+    [InlineData("/^Ada .*@Beta$/", true)]
+    public void CharacterCard(string value, bool expected)
+    {
+        var world = new World { LoggedIn = true, CharacterName = "Ada Moon", WorldName = "Alpha", HomeWorldName = "Beta" };
+        Assert.Equal("Ada Moon@Beta", world.CharacterKey);
+        Assert.Equal(expected, Eval.CardMatches(new Card { Section = Section.When, Type = CardType.Character, Value = value }, world));
+        Assert.False(Eval.CardMatches(new Card { Section = Section.When, Type = CardType.Character, Value = value }, new World()));
+    }
+
+    [Fact]
+    public void TargeterAndAccessoryTokens()
+    {
+        var world = new World { LoggedIn = true, Targeters = ["Near One", "Far One"], Accessory = "Parasol" };
+        Assert.Equal("Near One with Parasol", Tokens.Fill("{targeter} with {accessory}", world));
+        Assert.Equal(string.Empty, Tokens.Fill("{targeter}", new World()));
+    }
 }

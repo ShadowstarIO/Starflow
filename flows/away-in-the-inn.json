@@ -1,0 +1,12 @@
+{
+  "Name": "Away in the inn",
+  "Notes": "Sets your online status to Away while you're in an inn room. Puts it back when you leave.",
+  "Folder": "Shared",
+  "Mode": "Auto",
+  "OnStop": "Revert",
+  "WhenJoin": "All",
+  "Cards": [
+    { "Section": "When", "Type": "place", "Value": "Inn" },
+    { "Section": "Do", "Type": "online", "Value": "away" }
+  ]
+}

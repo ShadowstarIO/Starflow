@@ -1,0 +1,9 @@
+[
+  {
+    "File": "away-in-the-inn.json",
+    "Name": "Away in the inn",
+    "Description": "Away status while you're in an inn room, back to online when you leave.",
+    "Needs": [],
+    "Author": "Shadowstar"
+  }
+]

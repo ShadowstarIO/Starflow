@@ -1,5 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.IO.Compression;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -18,6 +21,57 @@ public static class Share
 
     public static string All(IEnumerable<FlowItem> flows) => JsonSerializer.Serialize(flows, Opt);
 
+    public const string CodePrefix = "SF1.";
+
+    private static readonly JsonSerializerOptions Compact = new()
+    {
+        WriteIndented = false,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        Converters = { new JsonStringEnumConverter() },
+    };
+
+    // One line for a post or a message: SF1. then the flows, compressed. Webhook URLs are left blank,
+    // since they work like passwords; blanked counts how many were taken out.
+    public static string Code(IEnumerable<FlowItem> flows, out int blanked)
+    {
+        blanked = 0;
+        var list = new List<FlowItem>();
+        foreach (var flow in flows)
+        {
+            if (!TryRead(One(flow), out var copy, out _)) continue;
+            foreach (var card in copy[0].Cards)
+            {
+                if (card.Type != CardType.Webhook || string.IsNullOrWhiteSpace(card.Value)) continue;
+                card.Value = string.Empty;
+                blanked++;
+            }
+            list.Add(copy[0]);
+        }
+        var json = list.Count == 1 ? JsonSerializer.Serialize(list[0], Compact) : JsonSerializer.Serialize(list, Compact);
+        var raw = Encoding.UTF8.GetBytes(json);
+        using var output = new MemoryStream();
+        using (var gz = new GZipStream(output, CompressionLevel.SmallestSize, true)) gz.Write(raw, 0, raw.Length);
+        return CodePrefix + Convert.ToBase64String(output.ToArray()).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+    }
+
+    private static string? Unpack(string code)
+    {
+        try
+        {
+            var text = code.Trim()[CodePrefix.Length..].Replace('-', '+').Replace('_', '/');
+            while (text.Length % 4 != 0) text += "=";
+            using var input = new MemoryStream(Convert.FromBase64String(text));
+            using var gz = new GZipStream(input, CompressionMode.Decompress);
+            using var output = new MemoryStream();
+            gz.CopyTo(output);
+            return Encoding.UTF8.GetString(output.ToArray());
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     public static bool TryRead(string text, out List<FlowItem> flows, out string error)
     {
         flows = [];
@@ -27,6 +81,16 @@ public static class Share
         {
             error = "Empty.";
             return false;
+        }
+        if (body.StartsWith(CodePrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            var unpacked = Unpack(body);
+            if (unpacked is null)
+            {
+                error = "That share code is cut short or damaged. Copy the whole line.";
+                return false;
+            }
+            body = unpacked.Trim();
         }
 
         try

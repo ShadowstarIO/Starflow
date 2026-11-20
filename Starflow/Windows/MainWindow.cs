@@ -141,12 +141,16 @@ public sealed partial class MainWindow : Window
             if (ImGui.Selectable("Housing: at a plot")) Add(cfg, Catalog.HousingTemplate());
             if (ImGui.Selectable("Schedule: weekday evenings")) Add(cfg, Catalog.ScheduleTemplate());
             if (ImGui.Selectable("Town: search comment in town")) Add(cfg, Catalog.TownTemplate());
+            ImGui.Separator();
+            if (ImGui.Selectable("Shared flows from GitHub...")) OpenShared();
+            Tip("Flows from the flows folder in Starflow's GitHub repo. Starflow fetches the list when you open this.");
             ImGui.EndPopup();
         }
         NextButton("Import");
         if (ImGui.Button("Import"))
         {
             showImport = true;
+            showShared = false;
             selectedCard = null;
         }
         Next(110);
@@ -288,8 +292,10 @@ public sealed partial class MainWindow : Window
         if (ImGui.Selectable($"{flow.Name}{priority}{tail}##{flow.Id}", flow.Id == selectedId))
         {
             selectedId = flow.Id;
+            copyMessage = string.Empty;
             selectedCard = null;
             showImport = false;
+            showShared = false;
         }
         if (on) ImGui.PopStyleColor();
         if (ImGui.IsItemHovered() && !ImGui.IsMouseDragging(ImGuiMouseButton.Left))
@@ -466,7 +472,15 @@ public sealed partial class MainWindow : Window
         }
 
         ImGui.Spacing();
-        if (ImGui.Button("Copy JSON")) ImGui.SetClipboardText(Share.One(flow));
+        if (ImGui.Button("Copy code"))
+        {
+            ImGui.SetClipboardText(Share.Code([flow], out var blanked));
+            copyMessage = blanked > 0 ? $"Copied. {blanked} webhook URL{(blanked == 1 ? " was" : "s were")} left out." : "Copied a one-line share code.";
+        }
+        Tip("One line, starting SF1., to paste in a post or message. Webhook URLs are left out.");
+        ImGui.SameLine();
+        if (ImGui.Button("Copy JSON")) { ImGui.SetClipboardText(Share.One(flow)); copyMessage = "Copied JSON."; }
+        Tip("Readable JSON, for the flows folder on GitHub or a backup. Webhook URLs are kept.");
         ImGui.SameLine();
         if (ImGui.Button("Duplicate") && Share.TryRead(Share.One(flow), out var copies, out _))
         {
@@ -487,7 +501,10 @@ public sealed partial class MainWindow : Window
             cfg.Save();
         }
         Ui.Tip("Hold Shift and click to delete.");
+        if (copyMessage.Length > 0) ImGui.TextDisabled(copyMessage);
     }
+
+    private string copyMessage = string.Empty;
 
     private void DrawSection(Configuration cfg, FlowItem flow, Section section, List<(Vector2 Top, Vector2 Bottom)> boxes)
     {
@@ -558,7 +575,7 @@ public sealed partial class MainWindow : Window
         for (var i = 0; i < cards.Count; i++)
         {
             var card = cards[i];
-            var chipWidth = ChipWidth(card.Label, condition, i, cards.Count);
+            var chipWidth = ChipWidth(card.Title, condition, i, cards.Count);
             if (i > 0)
             {
                 ImGui.SameLine();
@@ -584,8 +601,9 @@ public sealed partial class MainWindow : Window
         var style = ImGui.GetStyle();
         var small = ImGui.CalcTextSize("x").X + style.FramePadding.X * 2 + 2;
         var dot = condition ? Ui.DotWidth + 4 : 0;
+        var toggle = ImGui.GetTextLineHeight() + 4;
         var arrows = (index > 0 ? 1 : 0) + (index < count - 1 ? 1 : 0);
-        return dot + ImGui.CalcTextSize(label).X + style.FramePadding.X * 2 + small * (arrows + 1) + style.ItemSpacing.X * 2;
+        return toggle + dot + ImGui.CalcTextSize(label).X + style.FramePadding.X * 2 + small * (arrows + 1) + style.ItemSpacing.X * 2;
     }
 
     // [● name][<][>][x]. The dot fills when the condition is true right now. "not" leads the name when negated.
@@ -594,30 +612,47 @@ public sealed partial class MainWindow : Window
     {
         ImGui.PushID(card.Id);
         ImGui.BeginGroup();
+
+        // Small on/off box. Off keeps the card in the flow but skips it.
+        var on = !card.Off;
+        ImGui.PushStyleVar(ImGuiStyleVar.FramePadding, new Vector2(1, 1));
+        var boxY = ImGui.GetCursorPosY();
+        ImGui.SetCursorPosY(boxY + (ImGui.GetFrameHeight() - ImGui.GetTextLineHeight() - 2) * 0.5f);
+        if (ImGui.Checkbox("##on", ref on)) { card.Off = !on; cfg.Save(); }
+        ImGui.PopStyleVar();
+        if (ImGui.IsItemHovered()) ImGui.SetTooltip(card.Off ? "Off: skipped. Tick to switch it back on." : "On. Untick to skip this card without deleting it.");
+        ImGui.SameLine(0, 4);
+        ImGui.SetCursorPosY(boxY);
+
         if (condition)
         {
-            var live = world.LoggedIn && Eval.CardMatches(card, world);
+            var live = !card.Off && world.LoggedIn && Eval.CardMatches(card, world);
             Ui.Dot(live, live ? Green : Ui.Grey, ImGui.GetFrameHeight());
             ImGui.SameLine(0, 4);
         }
 
-        var error = plugin.Engine.Error(card.Id);
-        var missing = Catalog.Missing(card) is not null;
+        var error = card.Off ? null : plugin.Engine.Error(card.Id);
+        var missing = !card.Off && Catalog.Missing(card) is not null;
         var selected = card.Id == selectedCard;
         var colors = 0;
         if (selected) { ImGui.PushStyleColor(ImGuiCol.Button, ImGui.GetColorU32(ImGuiCol.ButtonActive)); colors++; }
-        if (error is not null || missing) { ImGui.PushStyleColor(ImGuiCol.Text, error is not null ? Red : Amber); colors++; }
-        if (ImGui.Button(card.Label)) selectedCard = card.Id;
+        if (card.Off) { ImGui.PushStyleColor(ImGuiCol.Text, ImGui.GetColorU32(ImGuiCol.TextDisabled)); colors++; }
+        else if (error is not null || missing) { ImGui.PushStyleColor(ImGuiCol.Text, error is not null ? Red : Amber); colors++; }
+        if (ImGui.Button(card.Title + "##chip")) selectedCard = card.Id;
         if (colors > 0) ImGui.PopStyleColor(colors);
+        if (card.Off) Strike(card.Title);
         if (ImGui.IsItemHovered())
         {
             var key = Catalog.Key(card.Section, index);
-            if (error is not null) ImGui.SetTooltip($"{key}: {error}");
+            if (!string.IsNullOrWhiteSpace(card.Note)) key += " · " + card.Label;
+            if (card.Off) ImGui.SetTooltip($"{key} is off and skipped. Tick the box or right-click to switch it on.");
+            else if (error is not null) ImGui.SetTooltip($"{key}: {error}");
             else if (missing) ImGui.SetTooltip($"{key} needs a {Catalog.Missing(card)}");
             else ImGui.SetTooltip(key + (condition ? " · right-click to negate, move, or delete" : " · right-click to move or delete"));
         }
         if (ImGui.BeginPopupContextItem("chip"))
         {
+            if (ImGui.Selectable(card.Off ? "Switch on" : "Switch off (keep, but skip)")) { card.Off = !card.Off; cfg.Save(); }
             if (condition && ImGui.Selectable(card.Not ? "Match normally" : "Negate (not)")) { card.Not = !card.Not; cfg.Save(); }
             if (index > 0 && ImGui.Selectable("Move left")) Move(cfg, flow, card, -1);
             if (index < count - 1 && ImGui.Selectable("Move right")) Move(cfg, flow, card, 1);
@@ -639,6 +674,17 @@ public sealed partial class MainWindow : Window
         if (ImGui.SmallButton("x")) Remove(cfg, flow, card);
         ImGui.EndGroup();
         ImGui.PopID();
+    }
+
+    // A line through the last button's label, for cards that are switched off.
+    private static void Strike(string label)
+    {
+        var min = ImGui.GetItemRectMin();
+        var max = ImGui.GetItemRectMax();
+        var pad = ImGui.GetStyle().FramePadding.X;
+        var textWidth = Math.Min(ImGui.CalcTextSize(label).X, max.X - min.X - pad * 2);
+        var y = (min.Y + max.Y) * 0.5f;
+        ImGui.GetWindowDrawList().AddLine(new Vector2(min.X + pad, y), new Vector2(min.X + pad + textWidth, y), ImGui.GetColorU32(ImGuiCol.TextDisabled), 1.5f);
     }
 
     private void Remove(Configuration cfg, FlowItem flow, Card card)
@@ -683,7 +729,7 @@ public sealed partial class MainWindow : Window
         {
             1 => "Paste AndThen rule JSON or an AT1. code. Rules come in off, with Keep.",
             2 => "Paste StatusShift rule JSON, its whole config, or an SS1. code. Rules come in off.",
-            _ => "Paste one flow or a list. They come in off.",
+            _ => "Paste an SF1. share code, one flow as JSON, or a list. They come in off.",
         });
         ImGui.InputTextMultiline("##import", ref importText, 64000, new Vector2(-1, 160));
         if (ImGui.Button("Import##go"))
@@ -706,8 +752,19 @@ public sealed partial class MainWindow : Window
                     if (importKind == 0) flow.Mode = RunMode.Off;
                     cfg.Flows.Add(flow);
                 }
+                var templates = 0;
+                if (importKind == 2)
+                {
+                    foreach (var body in Importers.StatusShiftTemplates(importText))
+                    {
+                        if (cfg.CommentTemplates.Contains(body)) continue;
+                        cfg.CommentTemplates.Add(body);
+                        templates++;
+                    }
+                }
                 cfg.Save();
                 importMsg = importKind == 0 ? $"Imported {flows.Count}. They are off." : message;
+                if (templates > 0) importMsg += $" Added {templates} search comment template{(templates == 1 ? string.Empty : "s")}.";
                 importText = string.Empty;
                 if (flows.Count > 0)
                 {

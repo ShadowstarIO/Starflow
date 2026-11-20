@@ -1,21 +1,25 @@
 # Shared flows
 
-Flows to copy into Starflow. Some are mine, some come from other players.
+Flows to bring into Starflow. Some are mine, some come from other players.
 
 ## Use one
 
-1. Open a `.json` file here and click **Copy raw file**.
-2. In game, open `/starflow`, click **Import**, and paste.
-3. Read through it, then tick **On** when you're happy with it. Imported flows come in off.
+**In game:** open `/starflow`, click **Templates**, then **Shared flows from GitHub...**. Pick one to see what it does, then click **Add**. Flows come in off; tick **On** once you've read it through.
+
+**By hand:** open a `.json` file here, click **Copy raw file**, then in Starflow click **Import** and paste.
 
 Check what a flow does before turning it on, especially Chat cards and anything that sends commands.
 
 ## Share one
 
 1. In Starflow, select the flow and click **Copy JSON**.
-2. Save it here as `short-name.json`, one flow per file, or a folder's flows as a list.
+2. Save it here as `short-name.json`: one flow per file, or a few related flows as a list.
 3. Put a line or two in the flow's **Notes**: what it does and which plugins it needs.
-4. Open a pull request, or post it in an issue and I can add it.
+4. Add an entry to `index.json` so it shows up in game:
+   ```json
+   { "File": "short-name.json", "Name": "Short name", "Description": "One line on what it does.", "Needs": ["Glamourer"], "Author": "Your name" }
+   ```
+5. Open a pull request, or post it in an issue and I can add it.
 
 Before sharing, take out anything personal: character names, linkshell or FC names, webhook URLs, and private addresses.
 
@@ -23,4 +27,4 @@ Before sharing, take out anything personal: character names, linkshell or FC nam
 
 | File | What it does | Needs |
 |---|---|---|
-| _(none yet)_ | | |
+| [away-in-the-inn.json](away-in-the-inn.json) | Away status while you're in an inn room, back to online when you leave. | |

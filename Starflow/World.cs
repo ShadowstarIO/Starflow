@@ -17,6 +17,8 @@ public sealed partial class World
     public string JobAbbr { get; init; } = string.Empty;
     public string JobName { get; init; } = string.Empty;
     public string CharacterName { get; init; } = string.Empty;
+    // First Last@HomeWorld, the form the Character card and its picker use.
+    public string CharacterKey => CharacterName.Length == 0 ? string.Empty : HomeWorldName.Length == 0 ? CharacterName : CharacterName + "@" + HomeWorldName;
     public string DutyName { get; init; } = string.Empty;
     public string Role { get; init; } = string.Empty;
     public int Level { get; init; }
@@ -36,6 +38,10 @@ public sealed partial class World
     public string WeatherNext { get; init; } = string.Empty;
     public int WeatherNextMinutes { get; init; }
     public string Mount { get; init; } = string.Empty;
+    // The fashion accessory you have out, such as a parasol.
+    public string Accessory { get; init; } = string.Empty;
+    // Players whose target is you, nearest first.
+    public List<string> Targeters { get; init; } = [];
     public Address Housing { get; init; } = Address.None;
     public string OnlineStatus { get; init; } = string.Empty;
     public string Target { get; init; } = "none";
