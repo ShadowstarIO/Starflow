@@ -123,8 +123,11 @@ public class ShareCodeTests
         var code = Share.Code([new FlowItem { Name = "A" }, new FlowItem { Name = "B" }], out _);
         Assert.True(Share.TryRead("  " + code.ToLowerInvariant()[..4].ToUpperInvariant() + code[4..] + "  ", out var back, out _));
         Assert.Equal(["A", "B"], back.Select(f => f.Name));
-        Assert.False(Share.TryRead(code[..(code.Length / 2)], out _, out var error));
-        Assert.Contains("cut short", error);
+        for (var cut = Share.CodePrefix.Length + 1; cut < code.Length - 16; cut++)
+        {
+            Assert.False(Share.TryRead(code[..cut], out _, out var error), $"cut at {cut}");
+            Assert.Contains("cut short", error);
+        }
     }
 
     [Fact]

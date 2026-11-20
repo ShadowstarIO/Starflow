@@ -23,6 +23,8 @@ public static class Share
 
     public const string CodePrefix = "SF1.";
 
+    private const string Damaged = "That share code is cut short or damaged. Copy the whole line.";
+
     private static readonly JsonSerializerOptions Compact = new()
     {
         WriteIndented = false,
@@ -77,6 +79,7 @@ public static class Share
         flows = [];
         error = string.Empty;
         var body = (text ?? string.Empty).Trim();
+        var fromCode = false;
         if (body.Length == 0)
         {
             error = "Empty.";
@@ -87,10 +90,11 @@ public static class Share
             var unpacked = Unpack(body);
             if (unpacked is null)
             {
-                error = "That share code is cut short or damaged. Copy the whole line.";
+                error = Damaged;
                 return false;
             }
             body = unpacked.Trim();
+            fromCode = true;
         }
 
         try
@@ -105,7 +109,7 @@ public static class Share
         }
         catch (Exception ex)
         {
-            error = ex.Message;
+            error = fromCode ? Damaged : ex.Message;
             return false;
         }
 
